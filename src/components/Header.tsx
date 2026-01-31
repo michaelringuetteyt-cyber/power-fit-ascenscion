@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Facebook } from "lucide-react";
 
 const Header = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -54,7 +54,16 @@ const Header = () => {
             </span>
           </a>
 
-          {/* Desktop Nav */}
+          {/* Facebook Link */}
+          <a
+            href="https://facebook.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden sm:flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors"
+            aria-label="Facebook"
+          >
+            <Facebook className="w-5 h-5 text-primary" />
+          </a>
           <nav className="hidden lg:flex items-center gap-8">
             {navLinks.map((link) => (
               <button

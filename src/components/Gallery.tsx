@@ -1,5 +1,6 @@
 import { useState } from "react";
 import heroCommunity from "@/assets/hero-community.png";
+import galleryCommunity from "@/assets/gallery-community.png";
 
 const Gallery = () => {
   const [activeFilter, setActiveFilter] = useState("all");
@@ -14,10 +15,10 @@ const Gallery = () => {
   // Gallery items with placeholder data
   const galleryItems = [
     { id: 1, category: "community", image: heroCommunity, title: "La famille Power Fit" },
-    { id: 2, category: "training", title: "Session Boxe Intense", color: "primary" },
-    { id: 3, category: "results", title: "Avant / Après", color: "secondary" },
-    { id: 4, category: "training", title: "Cardio HIIT", color: "primary" },
-    { id: 5, category: "community", title: "Événement Spécial", color: "secondary" },
+    { id: 2, category: "community", image: galleryCommunity, title: "Engagement & Motivation" },
+    { id: 3, category: "training", title: "Session Boxe Intense", color: "primary" },
+    { id: 4, category: "results", title: "Avant / Après", color: "secondary" },
+    { id: 5, category: "training", title: "Cardio HIIT", color: "primary" },
     { id: 6, category: "results", title: "Transformation", color: "primary" },
   ];
 

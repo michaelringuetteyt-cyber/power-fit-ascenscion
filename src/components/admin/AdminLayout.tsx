@@ -9,7 +9,8 @@ import {
   LayoutDashboard, 
   Menu, 
   X,
-  ArrowLeft
+  ArrowLeft,
+  CalendarDays
 } from "lucide-react";
 import { User } from "@supabase/supabase-js";
 
@@ -166,6 +167,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   const navItems = [
     { path: "/admin", icon: LayoutDashboard, label: "Dashboard" },
     { path: "/admin/chat", icon: MessageCircle, label: "Messages", badge: unreadCount },
+    { path: "/admin/bookings", icon: CalendarDays, label: "Réservations" },
     { path: "/admin/content", icon: Image, label: "Contenu" },
   ];
 

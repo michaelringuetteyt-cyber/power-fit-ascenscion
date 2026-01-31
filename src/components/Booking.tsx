@@ -1,11 +1,23 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Calendar, Clock, User, Mail, Phone, ChevronLeft, ChevronRight, Check } from "lucide-react";
+import { Calendar, Clock, User, Mail, Phone, ChevronLeft, ChevronRight, Check, AlertCircle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+
+interface AvailableDate {
+  id: string;
+  date: string;
+  time_slots: string[];
+  is_active: boolean;
+}
 
 const Booking = () => {
   const [step, setStep] = useState(1);
-  const [selectedDate, setSelectedDate] = useState<number | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const [availableDates, setAvailableDates] = useState<AvailableDate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -13,18 +25,47 @@ const Booking = () => {
     type: "trial",
   });
 
+  // Fetch available dates
+  useEffect(() => {
+    const fetchAvailableDates = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("available_dates")
+        .select("*")
+        .gte("date", new Date().toISOString().split("T")[0])
+        .order("date", { ascending: true });
+
+      if (error) {
+        console.error("Error fetching dates:", error);
+      } else {
+        setAvailableDates(data || []);
+      }
+      setLoading(false);
+    };
+
+    fetchAvailableDates();
+  }, []);
+
   // Generate calendar days for current month
-  const today = new Date();
-  const currentMonth = today.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
-  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-  const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).getDay();
+  const monthName = currentMonth.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+  const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
+  const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay();
   
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
   const paddingDays = Array.from({ length: firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1 }, () => null);
 
-  const timeSlots = [
-    "09:00", "10:00", "11:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"
-  ];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const isDateAvailable = (day: number) => {
+    const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    return availableDates.some(d => d.date === dateStr && d.is_active);
+  };
+
+  const getTimeSlotsForDate = (dateStr: string) => {
+    const dateInfo = availableDates.find(d => d.date === dateStr);
+    return dateInfo?.time_slots || [];
+  };
 
   const appointmentTypes = [
     { id: "trial", label: "Cours d'essai gratuit", icon: "🎯" },
@@ -32,9 +73,48 @@ const Booking = () => {
     { id: "coaching", label: "Session coaching", icon: "🏆" },
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handlePrevMonth = () => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setStep(4);
+    
+    if (!selectedDate || !selectedTime) return;
+
+    const { error } = await supabase.from("bookings").insert({
+      date: selectedDate,
+      time_slot: selectedTime,
+      appointment_type: formData.type,
+      client_name: formData.name,
+      client_email: formData.email,
+      client_phone: formData.phone,
+    });
+
+    if (error) {
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de la réservation.",
+        variant: "destructive",
+      });
+      console.error("Booking error:", error);
+    } else {
+      setStep(4);
+      toast({
+        title: "Réservation confirmée !",
+        description: "Vous recevrez un email de confirmation.",
+      });
+    }
+  };
+
+  const formatSelectedDate = () => {
+    if (!selectedDate) return "";
+    const date = new Date(selectedDate);
+    return date.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
   };
 
   return (
@@ -107,81 +187,116 @@ const Booking = () => {
             <div className="space-y-6">
               <h3 className="font-display text-2xl text-center mb-8">Choisissez votre créneau</h3>
               
-              {/* Calendar */}
-              <div className="bg-muted/30 rounded-xl p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <button className="p-2 hover:bg-muted rounded-lg transition-colors">
-                    <ChevronLeft className="w-5 h-5" />
-                  </button>
-                  <span className="font-display text-xl capitalize">{currentMonth}</span>
-                  <button className="p-2 hover:bg-muted rounded-lg transition-colors">
-                    <ChevronRight className="w-5 h-5" />
-                  </button>
+              {loading ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Chargement des disponibilités...
                 </div>
-                
-                {/* Day Headers */}
-                <div className="grid grid-cols-7 gap-2 mb-2">
-                  {["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"].map((day) => (
-                    <div key={day} className="text-center text-sm text-muted-foreground py-2">
-                      {day}
+              ) : availableDates.length === 0 ? (
+                <div className="text-center py-8">
+                  <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">
+                    Aucune date disponible pour le moment.<br />
+                    Veuillez nous contacter directement.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Calendar */}
+                  <div className="bg-muted/30 rounded-xl p-6">
+                    <div className="flex items-center justify-between mb-6">
+                      <button 
+                        onClick={handlePrevMonth}
+                        className="p-2 hover:bg-muted rounded-lg transition-colors"
+                      >
+                        <ChevronLeft className="w-5 h-5" />
+                      </button>
+                      <span className="font-display text-xl capitalize">{monthName}</span>
+                      <button 
+                        onClick={handleNextMonth}
+                        className="p-2 hover:bg-muted rounded-lg transition-colors"
+                      >
+                        <ChevronRight className="w-5 h-5" />
+                      </button>
                     </div>
-                  ))}
-                </div>
-                
-                {/* Calendar Days */}
-                <div className="grid grid-cols-7 gap-2">
-                  {paddingDays.map((_, i) => (
-                    <div key={`pad-${i}`} />
-                  ))}
-                  {days.map((day) => {
-                    const isPast = day < today.getDate();
-                    const isSelected = selectedDate === day;
-                    return (
-                      <button
-                        key={day}
-                        disabled={isPast}
-                        onClick={() => setSelectedDate(day)}
-                        className={`aspect-square rounded-lg flex items-center justify-center text-sm font-medium transition-all ${
-                          isPast
-                            ? "text-muted-foreground/50 cursor-not-allowed"
-                            : isSelected
-                            ? "bg-primary text-primary-foreground"
-                            : "hover:bg-muted"
-                        }`}
-                      >
-                        {day}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Time Slots */}
-              {selectedDate && (
-                <div>
-                  <h4 className="font-medium mb-4 flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-primary" />
-                    Horaires disponibles
-                  </h4>
-                  <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
-                    {timeSlots.map((time) => (
-                      <button
-                        key={time}
-                        onClick={() => {
-                          setSelectedTime(time);
-                          setStep(3);
-                        }}
-                        className={`py-3 px-4 rounded-lg border text-sm font-medium transition-all ${
-                          selectedTime === time
-                            ? "border-primary bg-primary/10 text-primary"
-                            : "border-border hover:border-primary/50"
-                        }`}
-                      >
-                        {time}
-                      </button>
-                    ))}
+                    
+                    {/* Day Headers */}
+                    <div className="grid grid-cols-7 gap-2 mb-2">
+                      {["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"].map((day) => (
+                        <div key={day} className="text-center text-sm text-muted-foreground py-2">
+                          {day}
+                        </div>
+                      ))}
+                    </div>
+                    
+                    {/* Calendar Days */}
+                    <div className="grid grid-cols-7 gap-2">
+                      {paddingDays.map((_, i) => (
+                        <div key={`pad-${i}`} />
+                      ))}
+                      {days.map((day) => {
+                        const dateObj = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+                        const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                        const isPast = dateObj < today;
+                        const isAvailable = isDateAvailable(day);
+                        const isSelected = selectedDate === dateStr;
+                        
+                        return (
+                          <button
+                            key={day}
+                            disabled={isPast || !isAvailable}
+                            onClick={() => setSelectedDate(dateStr)}
+                            className={`aspect-square rounded-lg flex items-center justify-center text-sm font-medium transition-all ${
+                              isPast || !isAvailable
+                                ? "text-muted-foreground/30 cursor-not-allowed"
+                                : isSelected
+                                ? "bg-primary text-primary-foreground"
+                                : isAvailable
+                                ? "bg-primary/20 text-primary hover:bg-primary/30"
+                                : "hover:bg-muted"
+                            }`}
+                          >
+                            {day}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    
+                    <div className="mt-4 flex items-center gap-4 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 rounded bg-primary/20" />
+                        <span>Disponible</span>
+                      </div>
+                    </div>
                   </div>
-                </div>
+
+                  {/* Time Slots */}
+                  {selectedDate && (
+                    <div>
+                      <h4 className="font-medium mb-4 flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-primary" />
+                        Horaires disponibles
+                      </h4>
+                      <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
+                        {getTimeSlotsForDate(selectedDate).map((time) => (
+                          <button
+                            key={time}
+                            onClick={() => {
+                              setSelectedTime(time);
+                              setStep(3);
+                            }}
+                            className={`py-3 px-4 rounded-lg border text-sm font-medium transition-all ${
+                              selectedTime === time
+                                ? "border-primary bg-primary/10 text-primary"
+                                : "border-border hover:border-primary/50"
+                            }`}
+                          >
+                            {time}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
               <Button variant="ghost" onClick={() => setStep(1)} className="mt-4">
@@ -264,7 +379,7 @@ const Booking = () => {
                 Merci {formData.name.split(" ")[0]} ! Votre rendez-vous est réservé.
               </p>
               <p className="text-foreground font-medium mb-8">
-                📅 {selectedDate} {currentMonth} à {selectedTime}
+                📅 {formatSelectedDate()} à {selectedTime}
               </p>
               <p className="text-sm text-muted-foreground">
                 Un email de confirmation vous a été envoyé à {formData.email}

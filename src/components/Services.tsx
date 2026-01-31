@@ -4,11 +4,11 @@ import { Button } from "@/components/ui/button";
 const offers = [
   {
     name: "Carte de 5 cours",
-    link: "https://square.link/u/cN6NZA7m",
+    link: "https://square.link/u/SYGFSved",
   },
   {
     name: "Carte de 10 cours",
-    link: "https://square.link/u/SYGFSved",
+    link: "https://square.link/u/cN6NZA7m",
   },
   {
     name: "Accès mensuel",

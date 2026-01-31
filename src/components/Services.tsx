@@ -90,7 +90,7 @@ const Services = () => {
           {services.map((service, index) => (
             <div
               key={service.title}
-              className="dashboard-card card-3d group relative overflow-hidden hover:border-primary/50 transition-all duration-500"
+              className="dashboard-card group relative overflow-hidden hover:border-primary/50 transition-all duration-500 hover:scale-[1.02]"
               style={{ animationDelay: `${index * 0.15}s` }}
             >
               {/* Header */}

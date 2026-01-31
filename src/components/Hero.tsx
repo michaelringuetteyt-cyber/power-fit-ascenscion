@@ -49,8 +49,7 @@ const Hero = () => {
           style={{ animationDelay: "0.2s" }}
         >
           <span className="text-foreground">POWER FIT</span>
-          <span className="text-gradient"> | </span>
-          <span className="text-gradient">ASCENSION</span>
+          <span className="text-gradient"> ASCENSION</span>
         </h1>
 
         {/* Tagline */}

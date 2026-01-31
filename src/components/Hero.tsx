@@ -8,7 +8,7 @@ const Hero = () => {
   };
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+    <section className="relative min-h-screen flex items-center justify-center overflow-hidden perspective-container">
       {/* Background Image with Overlay */}
       <div className="absolute inset-0">
         <img
@@ -20,16 +20,16 @@ const Hero = () => {
         <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-transparent to-secondary/20" />
       </div>
 
-      {/* Glow Effects */}
+      {/* 3D Glow Effects */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-[120px] animate-pulse-glow" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-secondary/20 rounded-full blur-[120px] animate-pulse-glow" style={{ animationDelay: "1s" }} />
 
       {/* Content */}
       <div className="relative z-10 container mx-auto px-6 text-center">
-        {/* Logo */}
-        <div className="mb-8 animate-slide-up">
+        {/* 3D Logo */}
+        <div className="mb-8 animate-slide-up tilt-3d">
           <div className="inline-flex items-center justify-center">
-            <div className="relative">
+            <div className="relative glass-3d p-4 rounded-2xl">
               <div className="w-24 h-24 md:w-32 md:h-32 border-4 border-foreground/80 rounded-b-3xl flex items-center justify-center bg-background/50 backdrop-blur-sm">
                 <div className="flex items-end gap-1">
                   <div className="w-2 h-8 md:w-3 md:h-12 bg-foreground rounded-t-sm" />
@@ -43,9 +43,9 @@ const Hero = () => {
           </div>
         </div>
 
-        {/* Title */}
+        {/* Title with 3D effect */}
         <h1 
-          className="font-display text-5xl md:text-7xl lg:text-8xl mb-4 tracking-wider animate-slide-up"
+          className="font-display text-5xl md:text-7xl lg:text-8xl mb-4 tracking-wider animate-slide-up text-3d"
           style={{ animationDelay: "0.2s" }}
         >
           <span className="text-foreground">POWER FIT</span>
@@ -67,15 +67,15 @@ const Hero = () => {
           Un corps. Une énergie. Un mouvement.
         </p>
 
-        {/* CTA Buttons */}
+        {/* CTA Buttons with 3D hover */}
         <div 
           className="flex flex-col sm:flex-row gap-4 justify-center items-center animate-slide-up"
           style={{ animationDelay: "0.6s" }}
         >
-          <Button variant="hero" size="xl" onClick={scrollToBooking}>
+          <Button variant="hero" size="xl" onClick={scrollToBooking} className="card-3d">
             Réserver mon cours gratuit
           </Button>
-          <Button variant="heroOutline" size="xl" onClick={() => document.getElementById("services")?.scrollIntoView({ behavior: "smooth" })}>
+          <Button variant="heroOutline" size="xl" onClick={() => document.getElementById("services")?.scrollIntoView({ behavior: "smooth" })} className="card-3d">
             Découvrir nos services
           </Button>
         </div>

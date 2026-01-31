@@ -59,7 +59,7 @@ const Pricing = () => {
   };
 
   return (
-    <section id="pricing" className="py-24 relative overflow-hidden">
+    <section id="pricing" className="py-24 relative overflow-hidden perspective-container">
       {/* Background Effects */}
       <div className="absolute top-1/2 left-0 w-[400px] h-[400px] bg-primary/10 rounded-full blur-[120px] -translate-y-1/2" />
       <div className="absolute top-1/2 right-0 w-[400px] h-[400px] bg-secondary/10 rounded-full blur-[120px] -translate-y-1/2" />
@@ -67,10 +67,10 @@ const Pricing = () => {
       <div className="container mx-auto px-6 relative z-10">
         {/* Section Header */}
         <div className="text-center mb-16">
-          <div className="inline-block px-4 py-2 bg-primary/10 rounded-full text-primary text-sm font-medium uppercase tracking-wider mb-4">
+          <div className="inline-block px-4 py-2 bg-primary/10 rounded-full text-primary text-sm font-medium uppercase tracking-wider mb-4 glass-3d">
             Tarifs & Formules
           </div>
-          <h2 className="font-display text-4xl md:text-6xl mb-4 tracking-wider">
+          <h2 className="font-display text-4xl md:text-6xl mb-4 tracking-wider text-3d">
             CHOISISSEZ VOTRE <span className="text-gradient">NIVEAU</span>
           </h2>
           <p className="text-muted-foreground text-lg max-w-xl mx-auto">
@@ -80,14 +80,15 @@ const Pricing = () => {
 
         {/* Pricing Cards */}
         <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-          {plans.map((plan) => (
+          {plans.map((plan, index) => (
             <div
               key={plan.name}
-              className={`dashboard-card relative ${
+              className={`dashboard-card card-3d relative ${
                 plan.popular 
-                  ? "border-primary/50 scale-105 md:scale-110" 
+                  ? "border-primary/50 scale-105 md:scale-110 neon-glow" 
                   : ""
               } transition-all duration-500 hover:border-primary/30`}
+              style={{ animationDelay: `${index * 0.15}s` }}
             >
               {/* Popular Badge */}
               {plan.popular && (
@@ -108,7 +109,7 @@ const Pricing = () => {
               {/* Price */}
               <div className="text-center mb-6">
                 <div className="flex items-end justify-center gap-1">
-                  <span className="font-display text-5xl text-gradient">{plan.price}€</span>
+                  <span className="font-display text-5xl text-gradient text-3d">{plan.price}€</span>
                   <span className="text-muted-foreground text-sm mb-2">{plan.period}</span>
                 </div>
                 <p className="text-muted-foreground text-sm mt-2">{plan.description}</p>

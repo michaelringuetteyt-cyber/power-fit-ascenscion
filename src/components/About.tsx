@@ -20,14 +20,14 @@ const About = () => {
   ];
 
   return (
-    <section id="about" className="py-24 relative overflow-hidden">
+    <section id="about" className="py-24 relative overflow-hidden perspective-container">
       {/* Background Glow */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[150px]" />
 
       <div className="container mx-auto px-6 relative z-10">
         {/* Section Header */}
         <div className="text-center mb-16">
-          <h2 className="font-display text-4xl md:text-6xl mb-4 tracking-wider">
+          <h2 className="font-display text-4xl md:text-6xl mb-4 tracking-wider text-3d">
             L'APPROCHE <span className="text-gradient">POWER FIT</span>
           </h2>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
@@ -41,11 +41,11 @@ const About = () => {
           {values.map((value, index) => (
             <div
               key={value.title}
-              className="dashboard-card group hover:border-primary/50 transition-all duration-500"
+              className="dashboard-card card-3d group hover:border-primary/50 transition-all duration-500"
               style={{ animationDelay: `${index * 0.2}s` }}
             >
-              <div className="mb-6">
-                <div className="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+              <div className="mb-6 card-3d-inner">
+                <div className="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors group-hover:neon-glow">
                   <value.icon className="w-8 h-8 text-primary" />
                 </div>
               </div>
@@ -62,9 +62,13 @@ const About = () => {
             { number: "15+", label: "Cours par semaine" },
             { number: "98%", label: "Satisfaction client" },
             { number: "3", label: "Piliers d'excellence" },
-          ].map((stat) => (
-            <div key={stat.label} className="text-center">
-              <div className="font-display text-4xl md:text-5xl text-gradient mb-2">{stat.number}</div>
+          ].map((stat, index) => (
+            <div 
+              key={stat.label} 
+              className="text-center float-3d"
+              style={{ animationDelay: `${index * 0.5}s` }}
+            >
+              <div className="font-display text-4xl md:text-5xl text-gradient mb-2 text-3d">{stat.number}</div>
               <div className="text-muted-foreground text-sm uppercase tracking-wider">{stat.label}</div>
             </div>
           ))}

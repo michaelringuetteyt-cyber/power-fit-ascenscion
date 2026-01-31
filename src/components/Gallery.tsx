@@ -26,14 +26,14 @@ const Gallery = () => {
     : galleryItems.filter(item => item.category === activeFilter);
 
   return (
-    <section id="gallery" className="py-24 relative">
+    <section id="gallery" className="py-24 relative perspective-container">
       <div className="container mx-auto px-6">
         {/* Section Header */}
         <div className="text-center mb-12">
-          <div className="inline-block px-4 py-2 bg-primary/10 rounded-full text-primary text-sm font-medium uppercase tracking-wider mb-4">
+          <div className="inline-block px-4 py-2 bg-primary/10 rounded-full text-primary text-sm font-medium uppercase tracking-wider mb-4 glass-3d">
             Notre Communauté
           </div>
-          <h2 className="font-display text-4xl md:text-6xl mb-4 tracking-wider">
+          <h2 className="font-display text-4xl md:text-6xl mb-4 tracking-wider text-3d">
             GALERIE DE <span className="text-gradient">TRANSFORMATION</span>
           </h2>
           <p className="text-muted-foreground text-lg max-w-xl mx-auto">
@@ -49,7 +49,7 @@ const Gallery = () => {
               onClick={() => setActiveFilter(filter.id)}
               className={`px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
                 activeFilter === filter.id
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-primary text-primary-foreground neon-glow"
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               }`}
             >
@@ -58,14 +58,15 @@ const Gallery = () => {
           ))}
         </div>
 
-        {/* Gallery Grid */}
+        {/* Gallery Grid with 3D */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {filteredItems.map((item, index) => (
             <div
               key={item.id}
-              className={`relative aspect-square rounded-xl overflow-hidden group cursor-pointer ${
+              className={`relative aspect-square rounded-xl overflow-hidden group cursor-pointer card-3d ${
                 index === 0 ? "col-span-2 row-span-2" : ""
               }`}
+              style={{ animationDelay: `${index * 0.1}s` }}
             >
               {item.image ? (
                 <img

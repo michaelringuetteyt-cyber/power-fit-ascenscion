@@ -30,7 +30,7 @@ const Services = () => {
   ];
 
   return (
-    <section id="services" className="py-24 relative">
+    <section id="services" className="py-24 relative perspective-container">
       {/* Grid Background Effect */}
       <div className="absolute inset-0 opacity-5">
         <div className="h-full w-full" style={{
@@ -45,10 +45,10 @@ const Services = () => {
       <div className="container mx-auto px-6 relative z-10">
         {/* Section Header */}
         <div className="text-center mb-16">
-          <div className="inline-block px-4 py-2 bg-primary/10 rounded-full text-primary text-sm font-medium uppercase tracking-wider mb-4">
+          <div className="inline-block px-4 py-2 bg-primary/10 rounded-full text-primary text-sm font-medium uppercase tracking-wider mb-4 glass-3d">
             Hub de Services
           </div>
-          <h2 className="font-display text-4xl md:text-6xl mb-4 tracking-wider">
+          <h2 className="font-display text-4xl md:text-6xl mb-4 tracking-wider text-3d">
             NOS <span className="text-gradient">3 PILIERS</span>
           </h2>
           <p className="text-muted-foreground text-lg max-w-xl mx-auto">
@@ -61,12 +61,13 @@ const Services = () => {
           {services.map((service, index) => (
             <div
               key={service.title}
-              className="dashboard-card group relative overflow-hidden hover:border-primary/50 transition-all duration-500"
+              className="dashboard-card card-3d group relative overflow-hidden hover:border-primary/50 transition-all duration-500"
+              style={{ animationDelay: `${index * 0.15}s` }}
             >
               {/* Header */}
               <div className="flex items-start justify-between mb-6">
-                <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${
-                  service.color === "primary" ? "bg-primary/20" : "bg-secondary/20"
+                <div className={`w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 ${
+                  service.color === "primary" ? "bg-primary/20 group-hover:neon-glow" : "bg-secondary/20"
                 }`}>
                   <service.icon className={`w-7 h-7 ${
                     service.color === "primary" ? "text-primary" : "text-secondary"

@@ -30,14 +30,14 @@ const Contact = () => {
   ];
 
   return (
-    <section id="contact" className="py-24 relative">
+    <section id="contact" className="py-24 relative perspective-container">
       <div className="container mx-auto px-6">
         {/* Section Header */}
         <div className="text-center mb-16">
-          <div className="inline-block px-4 py-2 bg-primary/10 rounded-full text-primary text-sm font-medium uppercase tracking-wider mb-4">
+          <div className="inline-block px-4 py-2 bg-primary/10 rounded-full text-primary text-sm font-medium uppercase tracking-wider mb-4 glass-3d">
             Contact
           </div>
-          <h2 className="font-display text-4xl md:text-6xl mb-4 tracking-wider">
+          <h2 className="font-display text-4xl md:text-6xl mb-4 tracking-wider text-3d">
             REJOIGNEZ <span className="text-gradient">L'ASCENSION</span>
           </h2>
           <p className="text-muted-foreground text-lg max-w-xl mx-auto">
@@ -49,9 +49,13 @@ const Contact = () => {
           {/* Contact Info */}
           <div className="space-y-6">
             <div className="grid sm:grid-cols-2 gap-4">
-              {contactInfo.map((info) => (
-                <div key={info.title} className="dashboard-card">
-                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
+              {contactInfo.map((info, index) => (
+                <div 
+                  key={info.title} 
+                  className="dashboard-card card-3d"
+                  style={{ animationDelay: `${index * 0.1}s` }}
+                >
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:neon-glow transition-all">
                     <info.icon className="w-6 h-6 text-primary" />
                   </div>
                   <h3 className="font-display text-xl mb-2 tracking-wide">{info.title}</h3>
@@ -62,18 +66,18 @@ const Contact = () => {
             </div>
 
             {/* Social Links */}
-            <div className="dashboard-card">
+            <div className="dashboard-card card-3d">
               <h3 className="font-display text-xl mb-4 tracking-wide">Suivez-nous</h3>
               <div className="flex gap-4">
                 <a
                   href="#"
-                  className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center hover:bg-primary/20 hover:text-primary transition-all duration-300"
+                  className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center hover:bg-primary/20 hover:text-primary hover:neon-glow transition-all duration-300"
                 >
                   <Instagram className="w-5 h-5" />
                 </a>
                 <a
                   href="#"
-                  className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center hover:bg-primary/20 hover:text-primary transition-all duration-300"
+                  className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center hover:bg-primary/20 hover:text-primary hover:neon-glow transition-all duration-300"
                 >
                   <Facebook className="w-5 h-5" />
                 </a>
@@ -82,19 +86,19 @@ const Contact = () => {
 
             {/* Quick Actions */}
             <div className="flex flex-col sm:flex-row gap-4">
-              <Button variant="hero" size="lg" className="flex-1">
+              <Button variant="hero" size="lg" className="flex-1 card-3d">
                 <Phone className="w-4 h-4 mr-2" />
                 Appeler maintenant
               </Button>
-              <Button variant="outline" size="lg" className="flex-1">
+              <Button variant="outline" size="lg" className="flex-1 card-3d">
                 <Mail className="w-4 h-4 mr-2" />
                 Envoyer un email
               </Button>
             </div>
           </div>
 
-          {/* Map Placeholder */}
-          <div className="dashboard-card p-0 overflow-hidden min-h-[400px]">
+          {/* Map Placeholder with 3D */}
+          <div className="dashboard-card card-3d p-0 overflow-hidden min-h-[400px]">
             <div className="w-full h-full bg-muted/50 flex items-center justify-center relative">
               {/* Stylized Map Background */}
               <div className="absolute inset-0 opacity-30">
@@ -108,8 +112,8 @@ const Contact = () => {
               </div>
               
               {/* Map Pin */}
-              <div className="relative z-10 text-center">
-                <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center mx-auto mb-4 animate-pulse-glow">
+              <div className="relative z-10 text-center float-3d">
+                <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center mx-auto mb-4 neon-glow">
                   <MapPin className="w-8 h-8 text-primary-foreground" />
                 </div>
                 <p className="font-display text-xl mb-2">POWER FIT | ASCENSION</p>

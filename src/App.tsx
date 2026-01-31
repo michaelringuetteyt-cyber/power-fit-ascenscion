@@ -4,7 +4,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
-import AdminChat from "./pages/AdminChat";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminChatPage from "./pages/admin/AdminChatPage";
+import AdminContentPage from "./pages/admin/AdminContentPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -17,7 +19,9 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
-          <Route path="/admin-chat" element={<AdminChat />} />
+          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/chat" element={<AdminChatPage />} />
+          <Route path="/admin/content" element={<AdminContentPage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

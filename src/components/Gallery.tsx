@@ -1,0 +1,99 @@
+import { useState } from "react";
+import heroCommunity from "@/assets/hero-community.png";
+
+const Gallery = () => {
+  const [activeFilter, setActiveFilter] = useState("all");
+
+  const filters = [
+    { id: "all", label: "Tous" },
+    { id: "training", label: "Entraînements" },
+    { id: "community", label: "Communauté" },
+    { id: "results", label: "Résultats" },
+  ];
+
+  // Gallery items with placeholder data
+  const galleryItems = [
+    { id: 1, category: "community", image: heroCommunity, title: "La famille Power Fit" },
+    { id: 2, category: "training", title: "Session Boxe Intense", color: "primary" },
+    { id: 3, category: "results", title: "Avant / Après", color: "secondary" },
+    { id: 4, category: "training", title: "Cardio HIIT", color: "primary" },
+    { id: 5, category: "community", title: "Événement Spécial", color: "secondary" },
+    { id: 6, category: "results", title: "Transformation", color: "primary" },
+  ];
+
+  const filteredItems = activeFilter === "all" 
+    ? galleryItems 
+    : galleryItems.filter(item => item.category === activeFilter);
+
+  return (
+    <section id="gallery" className="py-24 relative">
+      <div className="container mx-auto px-6">
+        {/* Section Header */}
+        <div className="text-center mb-12">
+          <div className="inline-block px-4 py-2 bg-primary/10 rounded-full text-primary text-sm font-medium uppercase tracking-wider mb-4">
+            Notre Communauté
+          </div>
+          <h2 className="font-display text-4xl md:text-6xl mb-4 tracking-wider">
+            GALERIE DE <span className="text-gradient">TRANSFORMATION</span>
+          </h2>
+          <p className="text-muted-foreground text-lg max-w-xl mx-auto">
+            Découvrez notre communauté engagée et leurs résultats
+          </p>
+        </div>
+
+        {/* Filters */}
+        <div className="flex flex-wrap justify-center gap-3 mb-12">
+          {filters.map((filter) => (
+            <button
+              key={filter.id}
+              onClick={() => setActiveFilter(filter.id)}
+              className={`px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
+                activeFilter === filter.id
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              }`}
+            >
+              {filter.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Gallery Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {filteredItems.map((item, index) => (
+            <div
+              key={item.id}
+              className={`relative aspect-square rounded-xl overflow-hidden group cursor-pointer ${
+                index === 0 ? "col-span-2 row-span-2" : ""
+              }`}
+            >
+              {item.image ? (
+                <img
+                  src={item.image}
+                  alt={item.title}
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                />
+              ) : (
+                <div className={`w-full h-full ${
+                  item.color === "primary" 
+                    ? "bg-gradient-to-br from-primary/30 to-primary/10" 
+                    : "bg-gradient-to-br from-secondary/30 to-secondary/10"
+                }`} />
+              )}
+              
+              {/* Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              
+              {/* Title */}
+              <div className="absolute bottom-0 left-0 right-0 p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-300">
+                <h3 className="font-display text-xl tracking-wide">{item.title}</h3>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
+
+export default Gallery;

@@ -1,5 +1,24 @@
-import { Dumbbell, Heart, Apple, ArrowRight } from "lucide-react";
+import { Dumbbell, Heart, Apple, ArrowRight, ExternalLink, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+const offers = [
+  {
+    name: "Carte de 5 cours",
+    link: "https://square.link/u/SYGFSved",
+  },
+  {
+    name: "Carte de 10 cours",
+    link: "https://square.link/u/cN6NZA7m",
+  },
+  {
+    name: "Accès mensuel",
+    link: "https://checkout.square.site/merchant/MLEF86NM8ND0R/checkout/MSWFFISP3EBKW5374LT2KA24",
+  },
+  {
+    name: "Engagement 12 mois",
+    link: "https://checkout.square.site/merchant/MLEF86NM8ND0R/checkout/NVQAXNOXQBYSTY3HRALCVIFO",
+  },
+];
 
 const Services = () => {
   const services = [
@@ -10,6 +29,7 @@ const Services = () => {
       description: "Des sessions dynamiques et variées pour tous les niveaux. Cardio intense, boxe pour se défouler, et circuits ciblés pour sculpter votre silhouette.",
       features: ["Sessions de 45-60 min", "Tous niveaux acceptés", "Équipement fourni", "Ambiance motivante"],
       color: "primary",
+      hasOffers: true,
     },
     {
       icon: Heart,
@@ -18,6 +38,7 @@ const Services = () => {
       description: "Un accompagnement sur-mesure avec évaluation complète de votre condition physique et un plan d'action adapté à vos objectifs.",
       features: ["Bilan initial complet", "Programme personnalisé", "Suivi régulier", "Ajustements continus"],
       color: "secondary",
+      hasOffers: false,
     },
     {
       icon: Apple,
@@ -26,8 +47,16 @@ const Services = () => {
       description: "Une approche nutritionnelle simple et efficace avec les produits Herbalife pour optimiser vos résultats et votre énergie au quotidien.",
       features: ["Conseils personnalisés", "Produits de qualité", "Plans repas simples", "Résultats durables"],
       color: "primary",
+      hasOffers: false,
     },
   ];
+
+  const scrollToContact = () => {
+    const contactSection = document.getElementById("contact");
+    if (contactSection) {
+      contactSection.scrollIntoView({ behavior: "smooth" });
+    }
+  };
 
   return (
     <section id="services" className="py-24 relative perspective-container">
@@ -99,11 +128,43 @@ const Services = () => {
                 ))}
               </ul>
 
-              {/* CTA */}
-              <Button variant="dashboard" className="w-full group/btn">
-                En savoir plus
-                <ArrowRight className="w-4 h-4 transition-transform group-hover/btn:translate-x-1" />
-              </Button>
+              {/* Offers Grid or Contact Button */}
+              {service.hasOffers ? (
+                <div className="space-y-3">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+                    Nos formules
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {offers.map((offer) => (
+                      <a
+                        key={offer.name}
+                        href={offer.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group/offer flex flex-col items-center justify-center p-3 rounded-lg bg-muted/50 border border-border hover:border-primary hover:bg-primary/10 transition-all duration-300"
+                      >
+                        <span className="text-xs font-medium text-foreground/90 text-center mb-2 leading-tight">
+                          {offer.name}
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-xs text-primary font-semibold">
+                          Réserver
+                          <ExternalLink className="w-3 h-3" />
+                        </span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <Button 
+                  variant="dashboard" 
+                  className="w-full group/btn"
+                  onClick={scrollToContact}
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  Nous contacter
+                  <ArrowRight className="w-4 h-4 transition-transform group-hover/btn:translate-x-1" />
+                </Button>
+              )}
 
               {/* Decorative Corner */}
               <div className={`absolute top-0 right-0 w-20 h-20 opacity-10 ${

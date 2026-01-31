@@ -56,7 +56,7 @@ const Header = () => {
 
           {/* Facebook Link */}
           <a
-            href="https://facebook.com"
+            href="https://www.facebook.com/profile.php?id=61586281512766"
             target="_blank"
             rel="noopener noreferrer"
             className="hidden sm:flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors"

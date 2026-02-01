@@ -112,7 +112,7 @@ const Booking = () => {
         description: "Une erreur est survenue lors de la réservation.",
         variant: "destructive",
       });
-      console.error("Booking error:", error);
+      if (import.meta.env.DEV) console.error("Booking error:", error);
     } else {
       setStep(4);
       toast({

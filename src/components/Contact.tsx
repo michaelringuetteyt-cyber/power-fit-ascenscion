@@ -119,8 +119,10 @@ const Contact = () => {
                 <p className="font-display text-xl mb-2">POWER FIT | ASCENSION</p>
                 <p className="text-muted-foreground text-sm">561 rue Champlain</p>
                 <p className="text-muted-foreground text-sm">Joliette, QC J6E 8N7</p>
-                <Button variant="outline" size="sm" className="mt-4">
-                  Ouvrir dans Google Maps
+                <Button variant="outline" size="sm" className="mt-4" asChild>
+                  <a href="https://www.google.com/maps/search/?api=1&query=561+rue+Champlain+Joliette+QC+Canada" target="_blank" rel="noopener noreferrer">
+                    Ouvrir dans Google Maps
+                  </a>
                 </Button>
               </div>
             </div>

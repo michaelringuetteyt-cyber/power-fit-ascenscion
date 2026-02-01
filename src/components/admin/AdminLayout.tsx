@@ -127,15 +127,18 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         .maybeSingle();
 
       if (!adminData) {
-        const { count } = await supabase
-          .from("admin_users")
-          .select("*", { count: "exact", head: true });
-
-        if (count === 0) {
-          await supabase.from("admin_users").insert({
-            user_id: data.user.id,
-            name: email.split("@")[0],
+        // Use atomic function to prevent race condition on first admin creation
+        const { data: isFirstAdmin, error: rpcError } = await supabase
+          .rpc('create_first_admin', {
+            new_user_id: data.user.id,
+            admin_name: email.split("@")[0],
           });
+
+        if (rpcError) {
+          if (import.meta.env.DEV) console.error("RPC error:", rpcError);
+        }
+
+        if (isFirstAdmin === true) {
           setIsAdmin(true);
           loadUnreadCount();
         } else {

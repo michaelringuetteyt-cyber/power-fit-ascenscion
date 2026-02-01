@@ -54,13 +54,13 @@ const Footer = () => {
                 <Facebook className="w-5 h-5" />
               </a>
               <a
-                href="mailto:contact@powerfit-ascension.com"
+                href="mailto:contact.powerfit.ascension@powerfitascension.com"
                 className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center hover:bg-primary/20 hover:text-primary transition-all duration-300"
               >
                 <Mail className="w-5 h-5" />
               </a>
               <a
-                href="tel:+33123456789"
+                href="tel:+15797661221"
                 className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center hover:bg-primary/20 hover:text-primary transition-all duration-300"
               >
                 <Phone className="w-5 h-5" />

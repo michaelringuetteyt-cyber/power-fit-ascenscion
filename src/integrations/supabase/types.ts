@@ -195,6 +195,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_access_chat_session: {
+        Args: { p_session_id: string }
+        Returns: boolean
+      }
       create_first_admin: {
         Args: { admin_name: string; new_user_id: string }
         Returns: boolean

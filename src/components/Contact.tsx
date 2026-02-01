@@ -59,7 +59,7 @@ const Contact = () => {
                     <info.icon className="w-6 h-6 text-primary" />
                   </div>
                   <h3 className="font-display text-xl mb-2 tracking-wide">{info.title}</h3>
-                  <p className="text-foreground">{info.content}</p>
+                  <p className="text-foreground break-all text-sm sm:text-base">{info.content}</p>
                   <p className="text-muted-foreground text-sm">{info.subcontent}</p>
                 </div>
               ))}

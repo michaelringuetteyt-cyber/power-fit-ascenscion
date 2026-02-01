@@ -90,9 +90,11 @@ const Contact = () => {
                 <Phone className="w-4 h-4 mr-2" />
                 Appeler maintenant
               </Button>
-              <Button variant="outline" size="lg" className="flex-1 card-3d">
-                <Mail className="w-4 h-4 mr-2" />
-                Envoyer un email
+              <Button variant="outline" size="lg" className="flex-1 card-3d" asChild>
+                <a href="mailto:contact.powerfit.ascension@powerfitascension.com">
+                  <Mail className="w-4 h-4 mr-2" />
+                  Envoyer un email
+                </a>
               </Button>
             </div>
           </div>

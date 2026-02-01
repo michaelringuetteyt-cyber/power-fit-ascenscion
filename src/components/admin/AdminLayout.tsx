@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/hooks/use-toast";
 import { 
   LogOut, 
   MessageCircle, 
@@ -109,7 +110,12 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
     });
 
     if (error) {
-      alert("Erreur de connexion: " + error.message);
+      if (import.meta.env.DEV) console.error("Auth error:", error);
+      toast({
+        title: "Erreur de connexion",
+        description: "Identifiants incorrects. Veuillez réessayer.",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -133,7 +139,11 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
           setIsAdmin(true);
           loadUnreadCount();
         } else {
-          alert("Vous n'êtes pas administrateur");
+          toast({
+            title: "Accès refusé",
+            description: "Vous n'êtes pas autorisé à accéder à cette zone.",
+            variant: "destructive",
+          });
           await supabase.auth.signOut();
         }
       } else {
@@ -158,9 +168,17 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
     });
 
     if (error) {
-      alert("Erreur: " + error.message);
+      if (import.meta.env.DEV) console.error("Signup error:", error);
+      toast({
+        title: "Erreur d'inscription",
+        description: "Une erreur est survenue. Veuillez réessayer.",
+        variant: "destructive",
+      });
     } else {
-      alert("Vérifiez votre email pour confirmer votre inscription");
+      toast({
+        title: "Inscription réussie",
+        description: "Vérifiez votre email pour confirmer votre inscription.",
+      });
     }
   };
 

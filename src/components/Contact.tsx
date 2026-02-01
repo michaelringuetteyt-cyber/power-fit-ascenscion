@@ -86,9 +86,11 @@ const Contact = () => {
 
             {/* Quick Actions */}
             <div className="flex flex-col sm:flex-row gap-4">
-              <Button variant="hero" size="lg" className="flex-1 card-3d">
-                <Phone className="w-4 h-4 mr-2" />
-                Appeler maintenant
+              <Button variant="hero" size="lg" className="flex-1 card-3d" asChild>
+                <a href="tel:+15797661221">
+                  <Phone className="w-4 h-4 mr-2" />
+                  Appeler maintenant
+                </a>
               </Button>
               <Button variant="outline" size="lg" className="flex-1 card-3d" asChild>
                 <a href="mailto:contact.powerfit.ascension@powerfitascension.com">

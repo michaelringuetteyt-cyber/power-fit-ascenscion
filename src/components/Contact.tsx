@@ -6,26 +6,26 @@ const Contact = () => {
     {
       icon: MapPin,
       title: "Adresse",
-      content: "123 Rue de la Transformation",
-      subcontent: "75001 Paris, France",
+      content: "561 rue Champlain",
+      subcontent: "Joliette, QC J6E 8N7, Canada",
     },
     {
       icon: Phone,
       title: "Téléphone",
-      content: "+33 1 23 45 67 89",
-      subcontent: "Du lundi au samedi",
+      content: "(579) 766-1221",
+      subcontent: "Lun-Dim",
     },
     {
       icon: Mail,
       title: "Email",
-      content: "contact@powerfit-ascension.com",
+      content: "contact.powerfit.ascension@powerfitascension.com",
       subcontent: "Réponse sous 24h",
     },
     {
       icon: Clock,
       title: "Horaires",
-      content: "Lun-Ven: 7h-21h",
-      subcontent: "Sam: 9h-18h | Dim: Fermé",
+      content: "Lun-Mer: 9h-17h | Jeu-Ven: 9h-21h",
+      subcontent: "Sam-Dim: 9h-14h",
     },
   ];
 
@@ -117,8 +117,8 @@ const Contact = () => {
                   <MapPin className="w-8 h-8 text-primary-foreground" />
                 </div>
                 <p className="font-display text-xl mb-2">POWER FIT | ASCENSION</p>
-                <p className="text-muted-foreground text-sm">123 Rue de la Transformation</p>
-                <p className="text-muted-foreground text-sm">75001 Paris</p>
+                <p className="text-muted-foreground text-sm">561 rue Champlain</p>
+                <p className="text-muted-foreground text-sm">Joliette, QC J6E 8N7</p>
                 <Button variant="outline" size="sm" className="mt-4">
                   Ouvrir dans Google Maps
                 </Button>

@@ -1,6 +1,9 @@
-import { useState } from "react";
-import { MapPin, Users, Sparkles, Maximize2, X } from "lucide-react";
+import { useState, useRef } from "react";
+import { MapPin, Users, Sparkles, Maximize2, X, Download } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import html2canvas from "html2canvas";
 import trialPassBg from "@/assets/trial-pass-bg.jpg";
 import logo from "@/assets/logo.png";
 
@@ -12,11 +15,44 @@ interface TrialPassCardProps {
 
 const TrialPassCard = ({ clientName, status, remainingSessions }: TrialPassCardProps) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const passRef = useRef<HTMLDivElement>(null);
+  const dialogPassRef = useRef<HTMLDivElement>(null);
   const currentYear = new Date().getFullYear();
   const isUsed = remainingSessions === 0 || status === "used";
 
-  const PassContent = ({ isDialog = false }: { isDialog?: boolean }) => (
-    <div className={`relative overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-br from-background via-muted/50 to-background ${isDialog ? "w-full max-w-lg mx-auto" : ""}`}>
+  const handleDownload = async () => {
+    const targetRef = isFullscreen ? dialogPassRef : passRef;
+    if (!targetRef.current) return;
+
+    setIsDownloading(true);
+    try {
+      const canvas = await html2canvas(targetRef.current, {
+        backgroundColor: "#0a0a0f",
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+      });
+
+      const link = document.createElement("a");
+      link.download = `laissez-passer-powerfit-${clientName || "client"}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+
+      toast.success("Laissez-passer téléchargé !");
+    } catch (error) {
+      console.error("Erreur lors du téléchargement:", error);
+      toast.error("Erreur lors du téléchargement");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const PassContent = ({ isDialog = false, innerRef }: { isDialog?: boolean; innerRef?: React.RefObject<HTMLDivElement> }) => (
+    <div 
+      ref={innerRef}
+      className={`relative overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-br from-background via-muted/50 to-background ${isDialog ? "w-full max-w-lg mx-auto" : ""}`}
+    >
       {/* Background image with overlay */}
       <div 
         className="absolute inset-0 opacity-20"
@@ -104,18 +140,30 @@ const TrialPassCard = ({ clientName, status, remainingSessions }: TrialPassCardP
   return (
     <>
       <div className="relative group">
-        <PassContent />
+        <PassContent innerRef={passRef} />
         
-        {/* Fullscreen button */}
-        {!isUsed && (
-          <button
-            onClick={() => setIsFullscreen(true)}
-            className="absolute top-4 right-4 z-20 p-2 rounded-lg bg-background/80 border border-border hover:bg-muted transition-colors opacity-0 group-hover:opacity-100 md:opacity-100"
-            title="Afficher en plein écran"
-          >
-            <Maximize2 className="w-5 h-5 text-primary" />
-          </button>
-        )}
+        {/* Action buttons */}
+        <div className="absolute top-4 right-4 z-20 flex gap-2 opacity-0 group-hover:opacity-100 md:opacity-100 transition-opacity">
+          {!isUsed && (
+            <>
+              <button
+                onClick={handleDownload}
+                disabled={isDownloading}
+                className="p-2 rounded-lg bg-background/80 border border-border hover:bg-muted transition-colors disabled:opacity-50"
+                title="Télécharger en image"
+              >
+                <Download className={`w-5 h-5 text-primary ${isDownloading ? "animate-pulse" : ""}`} />
+              </button>
+              <button
+                onClick={() => setIsFullscreen(true)}
+                className="p-2 rounded-lg bg-background/80 border border-border hover:bg-muted transition-colors"
+                title="Afficher en plein écran"
+              >
+                <Maximize2 className="w-5 h-5 text-primary" />
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Fullscreen Dialog */}
@@ -128,10 +176,21 @@ const TrialPassCard = ({ clientName, status, remainingSessions }: TrialPassCardP
             >
               <X className="w-5 h-5" />
             </button>
-            <PassContent isDialog />
-            <p className="text-center text-muted-foreground text-sm mt-4">
-              Présentez ce laissez-passer à l'accueil
-            </p>
+            <PassContent isDialog innerRef={dialogPassRef} />
+            <div className="flex flex-col items-center gap-3 mt-4">
+              <p className="text-muted-foreground text-sm">
+                Présentez ce laissez-passer à l'accueil
+              </p>
+              <Button
+                onClick={handleDownload}
+                disabled={isDownloading}
+                variant="outline"
+                className="gap-2"
+              >
+                <Download className={`w-4 h-4 ${isDownloading ? "animate-pulse" : ""}`} />
+                {isDownloading ? "Téléchargement..." : "Télécharger l'image"}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

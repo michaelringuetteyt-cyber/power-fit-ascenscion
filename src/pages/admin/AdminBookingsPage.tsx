@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
-import { Calendar, Plus, Trash2, Clock, Users } from "lucide-react";
+import { Calendar, Plus, Trash2, Clock, Users, CheckCircle, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -30,6 +30,15 @@ interface Booking {
   client_phone: string;
   status: string;
   created_at: string;
+  user_id: string | null;
+}
+
+interface DeductionResult {
+  success: boolean;
+  pass_id: string | null;
+  remaining_sessions: number | null;
+  pass_type: string | null;
+  message: string;
 }
 
 const DEFAULT_TIME_SLOTS = ["09:00", "10:00", "11:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"];
@@ -104,6 +113,57 @@ const AdminBookingsPage = () => {
     } else {
       setSelectedSlots([...selectedSlots, slot].sort());
     }
+  };
+
+  const handleConfirmBooking = async (booking: Booking) => {
+    // Update booking status
+    const { error: updateError } = await supabase
+      .from("bookings")
+      .update({ status: "confirmed" })
+      .eq("id", booking.id);
+
+    if (updateError) {
+      toast({ 
+        title: "Erreur", 
+        description: "Impossible de confirmer la réservation", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    // If user has an account, deduct a session
+    if (booking.user_id) {
+      const { data, error: deductError } = await supabase
+        .rpc("deduct_session_from_pass", { p_user_id: booking.user_id });
+
+      if (deductError) {
+        console.error("Deduction error:", deductError);
+        toast({ 
+          title: "Réservation confirmée", 
+          description: "Attention: impossible de déduire la séance du pass" 
+        });
+      } else if (data && data.length > 0) {
+        const result = data[0] as DeductionResult;
+        if (result.success) {
+          toast({ 
+            title: "Réservation confirmée", 
+            description: `${result.message}. Séances restantes: ${result.remaining_sessions! > 900 ? "illimité" : result.remaining_sessions}` 
+          });
+        } else {
+          toast({ 
+            title: "Réservation confirmée", 
+            description: `⚠️ ${result.message}` 
+          });
+        }
+      }
+    } else {
+      toast({ 
+        title: "Réservation confirmée", 
+        description: "Client sans compte - aucune déduction de pass" 
+      });
+    }
+
+    fetchData();
   };
 
   const formatDate = (dateStr: string) => {
@@ -253,18 +313,42 @@ const AdminBookingsPage = () => {
                           <p className="font-medium">{booking.client_name}</p>
                           <p className="text-sm text-muted-foreground">{booking.client_email}</p>
                         </div>
-                        <span className={`text-xs px-2 py-1 rounded-full ${
-                          booking.status === "confirmed" 
-                            ? "bg-green-500/20 text-green-500" 
-                            : "bg-yellow-500/20 text-yellow-500"
-                        }`}>
-                          {booking.status === "confirmed" ? "Confirmé" : "En attente"}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          {booking.status === "pending" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleConfirmBooking(booking)}
+                              className="gap-1 text-green-600 border-green-600 hover:bg-green-600/10"
+                            >
+                              <CheckCircle className="w-3 h-3" />
+                              Confirmer
+                            </Button>
+                          )}
+                          <span className={`text-xs px-2 py-1 rounded-full ${
+                            booking.status === "confirmed" 
+                              ? "bg-green-500/20 text-green-500" 
+                              : "bg-yellow-500/20 text-yellow-500"
+                          }`}>
+                            {booking.status === "confirmed" ? "Confirmé" : "En attente"}
+                          </span>
+                        </div>
                       </div>
                       <div className="text-sm text-muted-foreground">
                         <p>📅 {formatDate(booking.date)} à {booking.time_slot}</p>
                         <p>📞 {booking.client_phone}</p>
                         <p>🎯 {getAppointmentTypeLabel(booking.appointment_type)}</p>
+                        {booking.user_id ? (
+                          <p className="flex items-center gap-1 text-primary mt-1">
+                            <CheckCircle className="w-3 h-3" />
+                            Client avec compte
+                          </p>
+                        ) : (
+                          <p className="flex items-center gap-1 text-muted-foreground mt-1">
+                            <AlertCircle className="w-3 h-3" />
+                            Client sans compte
+                          </p>
+                        )}
                       </div>
                     </div>
                   ))}

@@ -12,11 +12,12 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Users, UserPlus, Shield, User, Mail, Trash2 } from "lucide-react";
+import { Users, UserPlus, Shield, User, Mail, Trash2, Ticket } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { z } from "zod";
+import PassManagement from "@/components/admin/PassManagement";
 
 interface Admin {
   id: string;
@@ -292,6 +293,10 @@ const AdminUsersPage = () => {
               <Users className="w-4 h-4" />
               Clients ({clients.length})
             </TabsTrigger>
+            <TabsTrigger value="passes" className="gap-2">
+              <Ticket className="w-4 h-4" />
+              Passes
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="admins">
@@ -383,6 +388,10 @@ const AdminUsersPage = () => {
                 </div>
               )}
             </div>
+          </TabsContent>
+
+          <TabsContent value="passes">
+            <PassManagement />
           </TabsContent>
         </Tabs>
       </div>

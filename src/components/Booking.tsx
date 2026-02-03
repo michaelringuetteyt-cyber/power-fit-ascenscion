@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Calendar, Clock, User, Mail, Phone, ChevronLeft, ChevronRight, Check, AlertCircle, MapPin } from "lucide-react";
+import { Calendar, Clock, User, Mail, Phone, ChevronLeft, ChevronRight, Check, AlertCircle, MapPin, LogIn } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
@@ -11,7 +12,14 @@ interface AvailableDate {
   is_active: boolean;
 }
 
+interface Profile {
+  full_name: string;
+  email: string;
+  phone: string | null;
+}
+
 const Booking = () => {
+  const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
@@ -19,12 +27,73 @@ const Booking = () => {
   const [loading, setLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showContactInfo, setShowContactInfo] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     phone: "",
     type: "trial",
   });
+
+  // Check auth status and load profile
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+        setIsLoggedIn(true);
+        
+        // Load profile to pre-fill form
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("full_name, email, phone")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        
+        if (profile) {
+          setFormData(prev => ({
+            ...prev,
+            name: profile.full_name || "",
+            email: profile.email || "",
+            phone: profile.phone || "",
+          }));
+        }
+      }
+    };
+
+    checkAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (session?.user) {
+          setUserId(session.user.id);
+          setIsLoggedIn(true);
+          
+          // Load profile on login
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("full_name, email, phone")
+            .eq("user_id", session.user.id)
+            .maybeSingle();
+          
+          if (profile) {
+            setFormData(prev => ({
+              ...prev,
+              name: profile.full_name || "",
+              email: profile.email || "",
+              phone: profile.phone || "",
+            }));
+          }
+        } else {
+          setUserId(null);
+          setIsLoggedIn(false);
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Fetch available dates
   useEffect(() => {
@@ -97,14 +166,21 @@ const Booking = () => {
     
     if (!selectedDate || !selectedTime) return;
 
-    const { error } = await supabase.from("bookings").insert({
+    const bookingData: any = {
       date: selectedDate,
       time_slot: selectedTime,
       appointment_type: formData.type,
       client_name: formData.name,
       client_email: formData.email,
       client_phone: formData.phone,
-    });
+    };
+
+    // Link to user account if logged in
+    if (userId) {
+      bookingData.user_id = userId;
+    }
+
+    const { error } = await supabase.from("bookings").insert(bookingData);
 
     if (error) {
       toast({
@@ -117,7 +193,9 @@ const Booking = () => {
       setStep(4);
       toast({
         title: "Réservation confirmée !",
-        description: "Vous recevrez un email de confirmation.",
+        description: isLoggedIn 
+          ? "Votre réservation est visible dans votre espace client."
+          : "Vous recevrez un email de confirmation.",
       });
     }
   };
@@ -411,6 +489,40 @@ const Booking = () => {
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <h3 className="font-display text-2xl text-center mb-8">Vos informations</h3>
                   
+                  {/* Login prompt for guests */}
+                  {!isLoggedIn && (
+                    <div className="p-4 rounded-lg bg-primary/10 border border-primary/20 mb-6">
+                      <div className="flex items-start gap-3">
+                        <LogIn className="w-5 h-5 text-primary mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium mb-1">Déjà client ?</p>
+                          <p className="text-xs text-muted-foreground mb-3">
+                            Connectez-vous pour retrouver vos réservations dans votre espace client.
+                          </p>
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => navigate("/auth")}
+                          >
+                            Se connecter
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {isLoggedIn && (
+                    <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20 mb-6">
+                      <div className="flex items-center gap-2 text-green-400">
+                        <Check className="w-5 h-5" />
+                        <span className="text-sm font-medium">
+                          Connecté — Cette réservation sera liée à votre compte
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="space-y-4">
                     <div>
                       <label className="flex items-center gap-2 text-sm font-medium mb-2">
@@ -437,8 +549,9 @@ const Booking = () => {
                         required
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        className="w-full px-4 py-3 bg-muted border border-border rounded-lg focus:outline-none focus:border-primary transition-colors"
+                        className={`w-full px-4 py-3 bg-muted border border-border rounded-lg focus:outline-none focus:border-primary transition-colors ${isLoggedIn ? "opacity-75" : ""}`}
                         placeholder="jean@exemple.com"
+                        readOnly={isLoggedIn}
                       />
                     </div>
                     

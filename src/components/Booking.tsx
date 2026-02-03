@@ -10,6 +10,13 @@ interface AvailableDate {
   date: string;
   time_slots: string[];
   is_active: boolean;
+  max_bookings: number;
+}
+
+interface SlotBookingCount {
+  date: string;
+  time_slot: string;
+  count: number;
 }
 
 interface Profile {
@@ -24,6 +31,7 @@ const Booking = () => {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [availableDates, setAvailableDates] = useState<AvailableDate[]>([]);
+  const [slotBookingCounts, setSlotBookingCounts] = useState<SlotBookingCount[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showContactInfo, setShowContactInfo] = useState(false);
@@ -95,21 +103,46 @@ const Booking = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Fetch available dates
+  // Fetch available dates and booking counts
   useEffect(() => {
     const fetchAvailableDates = async () => {
       setLoading(true);
-      const { data, error } = await supabase
+      
+      // Fetch available dates
+      const { data: datesData, error: datesError } = await supabase
         .from("available_dates")
         .select("*")
         .gte("date", new Date().toISOString().split("T")[0])
         .order("date", { ascending: true });
 
-      if (error) {
-        console.error("Error fetching dates:", error);
+      if (datesError) {
+        console.error("Error fetching dates:", datesError);
       } else {
-        setAvailableDates(data || []);
+        setAvailableDates(datesData || []);
       }
+
+      // Fetch booking counts per slot
+      const { data: bookingsData, error: bookingsError } = await supabase
+        .from("bookings")
+        .select("date, time_slot")
+        .gte("date", new Date().toISOString().split("T")[0]);
+
+      if (bookingsError) {
+        console.error("Error fetching booking counts:", bookingsError);
+      } else if (bookingsData) {
+        // Count bookings per date/slot
+        const counts: SlotBookingCount[] = [];
+        bookingsData.forEach(booking => {
+          const existing = counts.find(c => c.date === booking.date && c.time_slot === booking.time_slot);
+          if (existing) {
+            existing.count++;
+          } else {
+            counts.push({ date: booking.date, time_slot: booking.time_slot, count: 1 });
+          }
+        });
+        setSlotBookingCounts(counts);
+      }
+
       setLoading(false);
     };
 
@@ -135,6 +168,28 @@ const Booking = () => {
   const getTimeSlotsForDate = (dateStr: string) => {
     const dateInfo = availableDates.find(d => d.date === dateStr);
     return dateInfo?.time_slots || [];
+  };
+
+  const isSlotFull = (dateStr: string, timeSlot: string) => {
+    const dateInfo = availableDates.find(d => d.date === dateStr);
+    if (!dateInfo) return false;
+    
+    const bookingCount = slotBookingCounts.find(
+      c => c.date === dateStr && c.time_slot === timeSlot
+    )?.count || 0;
+    
+    return bookingCount >= dateInfo.max_bookings;
+  };
+
+  const getRemainingSpots = (dateStr: string, timeSlot: string) => {
+    const dateInfo = availableDates.find(d => d.date === dateStr);
+    if (!dateInfo) return 0;
+    
+    const bookingCount = slotBookingCounts.find(
+      c => c.date === dateStr && c.time_slot === timeSlot
+    )?.count || 0;
+    
+    return Math.max(0, dateInfo.max_bookings - bookingCount);
   };
 
   const appointmentTypes = [
@@ -456,22 +511,37 @@ const Booking = () => {
                             Horaires disponibles
                           </h4>
                           <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
-                            {getTimeSlotsForDate(selectedDate).map((time) => (
-                              <button
-                                key={time}
-                                onClick={() => {
-                                  setSelectedTime(time);
-                                  setStep(3);
-                                }}
-                                className={`py-3 px-4 rounded-lg border text-sm font-medium transition-all ${
-                                  selectedTime === time
-                                    ? "border-primary bg-primary/10 text-primary"
-                                    : "border-border hover:border-primary/50"
-                                }`}
-                              >
-                                {time}
-                              </button>
-                            ))}
+                            {getTimeSlotsForDate(selectedDate).map((time) => {
+                              const isFull = isSlotFull(selectedDate, time);
+                              const remaining = getRemainingSpots(selectedDate, time);
+                              
+                              return (
+                                <button
+                                  key={time}
+                                  disabled={isFull}
+                                  onClick={() => {
+                                    if (!isFull) {
+                                      setSelectedTime(time);
+                                      setStep(3);
+                                    }
+                                  }}
+                                  className={`py-3 px-4 rounded-lg border text-sm font-medium transition-all relative ${
+                                    isFull
+                                      ? "border-border bg-muted/50 text-muted-foreground cursor-not-allowed"
+                                      : selectedTime === time
+                                      ? "border-primary bg-primary/10 text-primary"
+                                      : "border-border hover:border-primary/50"
+                                  }`}
+                                >
+                                  <span>{time}</span>
+                                  {isFull ? (
+                                    <span className="block text-xs text-destructive mt-1">Complet</span>
+                                  ) : remaining <= 2 ? (
+                                    <span className="block text-xs text-orange-500 mt-1">{remaining} place{remaining > 1 ? 's' : ''}</span>
+                                  ) : null}
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
                       )}

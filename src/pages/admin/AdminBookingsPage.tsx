@@ -18,6 +18,7 @@ interface AvailableDate {
   time_slots: string[];
   is_active: boolean;
   created_at: string;
+  max_bookings: number;
 }
 
 interface Booking {
@@ -49,6 +50,7 @@ const AdminBookingsPage = () => {
   const [loading, setLoading] = useState(true);
   const [newDate, setNewDate] = useState("");
   const [selectedSlots, setSelectedSlots] = useState<string[]>(DEFAULT_TIME_SLOTS);
+  const [maxBookings, setMaxBookings] = useState(1);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const fetchData = async () => {
@@ -79,6 +81,7 @@ const AdminBookingsPage = () => {
       date: newDate,
       time_slots: selectedSlots,
       is_active: true,
+      max_bookings: maxBookings,
     });
 
     if (error) {
@@ -91,6 +94,7 @@ const AdminBookingsPage = () => {
       toast({ title: "Succès", description: "Date ajoutée avec succès" });
       setNewDate("");
       setSelectedSlots(DEFAULT_TIME_SLOTS);
+      setMaxBookings(1);
       setIsDialogOpen(false);
       fetchData();
     }
@@ -235,6 +239,21 @@ const AdminBookingsPage = () => {
                     ))}
                   </div>
                 </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Réservations max par créneau</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="50"
+                    value={maxBookings}
+                    onChange={(e) => setMaxBookings(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-full px-4 py-2 bg-muted border border-border rounded-lg focus:outline-none focus:border-primary"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Le créneau sera fermé automatiquement une fois cette limite atteinte
+                  </p>
+                </div>
                 
                 <Button onClick={handleAddDate} className="w-full" variant="hero">
                   Ajouter
@@ -269,11 +288,19 @@ const AdminBookingsPage = () => {
                     >
                       <div>
                         <p className="font-medium capitalize">{formatDate(date.date)}</p>
-                        <div className="flex items-center gap-1 mt-1">
-                          <Clock className="w-3 h-3 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground">
-                            {date.time_slots.length} créneaux
-                          </span>
+                        <div className="flex items-center gap-3 mt-1">
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">
+                              {date.time_slots.length} créneaux
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Users className="w-3 h-3 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">
+                              max {date.max_bookings} résa/créneau
+                            </span>
+                          </div>
                         </div>
                       </div>
                       <Button

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
-import { Calendar, Plus, Trash2, Clock, Users, CheckCircle, AlertCircle } from "lucide-react";
+import { Calendar, Plus, Trash2, Clock, Users, CheckCircle, AlertCircle, Edit2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -52,6 +52,9 @@ const AdminBookingsPage = () => {
   const [selectedSlots, setSelectedSlots] = useState<string[]>(DEFAULT_TIME_SLOTS);
   const [maxBookings, setMaxBookings] = useState(1);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingDate, setEditingDate] = useState<AvailableDate | null>(null);
+  const [editMaxBookings, setEditMaxBookings] = useState(1);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -116,6 +119,30 @@ const AdminBookingsPage = () => {
       setSelectedSlots(selectedSlots.filter(s => s !== slot));
     } else {
       setSelectedSlots([...selectedSlots, slot].sort());
+    }
+  };
+
+  const handleEditMaxBookings = (date: AvailableDate) => {
+    setEditingDate(date);
+    setEditMaxBookings(date.max_bookings);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdateMaxBookings = async () => {
+    if (!editingDate) return;
+
+    const { error } = await supabase
+      .from("available_dates")
+      .update({ max_bookings: editMaxBookings })
+      .eq("id", editingDate.id);
+
+    if (error) {
+      toast({ title: "Erreur", description: "Impossible de modifier le nombre de places", variant: "destructive" });
+    } else {
+      toast({ title: "Succès", description: "Nombre de places mis à jour" });
+      setIsEditDialogOpen(false);
+      setEditingDate(null);
+      fetchData();
     }
   };
 
@@ -261,6 +288,36 @@ const AdminBookingsPage = () => {
               </div>
             </DialogContent>
           </Dialog>
+
+          {/* Edit Max Bookings Dialog */}
+          <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Modifier le nombre de places</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-4">
+                {editingDate && (
+                  <p className="text-sm text-muted-foreground">
+                    {formatDate(editingDate.date)}
+                  </p>
+                )}
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Réservations max par créneau</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="50"
+                    value={editMaxBookings}
+                    onChange={(e) => setEditMaxBookings(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-full px-4 py-2 bg-muted border border-border rounded-lg focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <Button onClick={handleUpdateMaxBookings} className="w-full" variant="hero">
+                  Enregistrer
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {loading ? (
@@ -303,14 +360,24 @@ const AdminBookingsPage = () => {
                           </div>
                         </div>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteDate(date.id)}
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEditMaxBookings(date)}
+                          className="text-primary hover:text-primary hover:bg-primary/10"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteDate(date.id)}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>

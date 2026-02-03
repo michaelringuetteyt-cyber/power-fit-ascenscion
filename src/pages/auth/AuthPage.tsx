@@ -38,9 +38,11 @@ const AuthPage = () => {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        if (session?.user) {
-          // Check if admin and redirect accordingly
-          checkRoleAndRedirect(session.user.id);
+        if (event === 'SIGNED_IN' && session?.user) {
+          // Use setTimeout to defer navigation and avoid deadlock
+          setTimeout(() => {
+            checkRoleAndRedirect(session.user.id);
+          }, 0);
         }
       }
     );
@@ -52,7 +54,7 @@ const AuthPage = () => {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [navigate]);
 
   const checkRoleAndRedirect = async (userId: string) => {
     const { data: roles } = await supabase

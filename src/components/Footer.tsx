@@ -1,4 +1,5 @@
 import { Instagram, Facebook, Mail, Phone } from "lucide-react";
+import logo from "@/assets/logo.png";
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -23,18 +24,7 @@ const Footer = () => {
           {/* Brand */}
           <div className="md:col-span-2">
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 border-2 border-foreground/80 rounded-b-xl flex items-center justify-center">
-                <div className="flex items-end gap-0.5">
-                  <div className="w-1.5 h-4 bg-foreground rounded-t-sm" />
-                  <div className="w-1.5 h-5 bg-foreground rounded-t-sm" />
-                  <div className="w-1.5 h-4.5 bg-primary rounded-t-sm" />
-                  <div className="w-1.5 h-5 bg-foreground rounded-t-sm" />
-                  <div className="w-1.5 h-4 bg-foreground rounded-t-sm" />
-                </div>
-              </div>
-              <span className="font-display text-2xl tracking-wider">
-                POWER FIT <span className="text-primary">|</span> ASCENSION
-              </span>
+              <img src={logo} alt="Power Fit Ascension" className="h-16 w-auto" />
             </div>
             <p className="text-muted-foreground mb-6 max-w-md">
               Plus qu'un club de fitness — un espace de transformation physique et mentale 

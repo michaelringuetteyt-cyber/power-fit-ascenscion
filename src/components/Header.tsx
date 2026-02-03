@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, X, Facebook } from "lucide-react";
+import logo from "@/assets/logo.png";
 
 const Header = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -38,19 +39,8 @@ const Header = () => {
       <div className="container mx-auto px-6">
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
-          <a href="#" className="flex items-center gap-3">
-            <div className="w-10 h-10 border-2 border-foreground/80 rounded-b-xl flex items-center justify-center">
-              <div className="flex items-end gap-0.5">
-                <div className="w-1 h-3 bg-foreground rounded-t-sm" />
-                <div className="w-1 h-4 bg-foreground rounded-t-sm" />
-                <div className="w-1 h-3.5 bg-primary rounded-t-sm" />
-                <div className="w-1 h-4 bg-foreground rounded-t-sm" />
-                <div className="w-1 h-3 bg-foreground rounded-t-sm" />
-              </div>
-            </div>
-            <span className="font-display text-xl tracking-wider hidden sm:block">
-              POWER FIT <span className="text-primary">|</span> ASCENSION
-            </span>
+          <a href="#" className="flex items-center gap-2">
+            <img src={logo} alt="Power Fit Ascension" className="h-12 w-auto" />
           </a>
 
           {/* Facebook Link */}

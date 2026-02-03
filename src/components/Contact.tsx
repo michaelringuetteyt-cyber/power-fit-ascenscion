@@ -17,9 +17,15 @@ const Contact = () => {
     },
     {
       icon: Mail,
-      title: "Email",
+      title: "Email Général",
       content: "contact.powerfit.ascension@powerfitascension.com",
       subcontent: "Réponse sous 24h",
+    },
+    {
+      icon: Mail,
+      title: "Email Coaching",
+      content: "coaching.powerfit.ascension@powerfitascension.com",
+      subcontent: "Questions sur le coaching",
     },
     {
       icon: Clock,

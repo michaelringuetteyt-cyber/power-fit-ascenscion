@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Ticket, Plus, User, History, Edit2 } from "lucide-react";
+import { Ticket, Plus, User, History, Edit2, CalendarCheck, MinusCircle } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -48,6 +48,17 @@ interface Purchase {
   payment_status: string;
 }
 
+interface SessionDeduction {
+  id: string;
+  user_id: string;
+  pass_id: string;
+  booking_id: string | null;
+  deducted_at: string;
+  pass_type: string;
+  remaining_after: number;
+  notes: string | null;
+}
+
 interface ClientWithPass extends Profile {
   totalRemainingSessions: number;
   activePasses: Pass[];
@@ -71,6 +82,7 @@ const PassManagement = () => {
   const [selectedPass, setSelectedPass] = useState<Pass | null>(null);
   const [newSessions, setNewSessions] = useState("");
   const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [deductions, setDeductions] = useState<SessionDeduction[]>([]);
   
   // Form state
   const [passType, setPassType] = useState("");
@@ -195,13 +207,22 @@ const PassManagement = () => {
   const loadPurchaseHistory = async (client: ClientWithPass) => {
     setSelectedClient(client);
     
-    const { data } = await supabase
-      .from("purchases")
-      .select("*")
-      .eq("user_id", client.user_id)
-      .order("purchase_date", { ascending: false });
+    // Load purchases and deductions in parallel
+    const [purchasesRes, deductionsRes] = await Promise.all([
+      supabase
+        .from("purchases")
+        .select("*")
+        .eq("user_id", client.user_id)
+        .order("purchase_date", { ascending: false }),
+      supabase
+        .from("session_deductions")
+        .select("*")
+        .eq("user_id", client.user_id)
+        .order("deducted_at", { ascending: false })
+    ]);
     
-    setPurchases(data || []);
+    setPurchases(purchasesRes.data || []);
+    setDeductions(deductionsRes.data || []);
     setHistoryDialogOpen(true);
   };
 
@@ -452,6 +473,39 @@ const PassManagement = () => {
                       <p className="text-sm text-muted-foreground">
                         {format(new Date(purchase.purchase_date), "d MMM yyyy à HH:mm", { locale: fr })}
                       </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Deductions History */}
+            <div>
+              <h4 className="font-medium mb-2 flex items-center gap-2">
+                <MinusCircle className="w-4 h-4 text-orange-500" />
+                Historique des déductions
+              </h4>
+              {deductions.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">
+                  Aucune déduction enregistrée
+                </p>
+              ) : (
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {deductions.map((deduction) => (
+                    <div key={deduction.id} className="p-3 bg-orange-500/10 rounded-lg border border-orange-500/20">
+                      <div className="flex items-center justify-between">
+                        <p className="font-medium text-sm">{getPassTypeLabel(deduction.pass_type)}</p>
+                        <span className="text-xs bg-muted px-2 py-0.5 rounded">
+                          Reste: {deduction.remaining_after > 900 ? "∞" : deduction.remaining_after}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                        <CalendarCheck className="w-3 h-3" />
+                        {format(new Date(deduction.deducted_at), "d MMM yyyy à HH:mm", { locale: fr })}
+                      </p>
+                      {deduction.notes && (
+                        <p className="text-xs text-muted-foreground mt-1">{deduction.notes}</p>
+                      )}
                     </div>
                   ))}
                 </div>

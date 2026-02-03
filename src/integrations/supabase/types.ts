@@ -293,6 +293,54 @@ export type Database = {
           },
         ]
       }
+      session_deductions: {
+        Row: {
+          booking_id: string | null
+          deducted_at: string
+          id: string
+          notes: string | null
+          pass_id: string
+          pass_type: string
+          remaining_after: number
+          user_id: string
+        }
+        Insert: {
+          booking_id?: string | null
+          deducted_at?: string
+          id?: string
+          notes?: string | null
+          pass_id: string
+          pass_type: string
+          remaining_after: number
+          user_id: string
+        }
+        Update: {
+          booking_id?: string | null
+          deducted_at?: string
+          id?: string
+          notes?: string | null
+          pass_id?: string
+          pass_type?: string
+          remaining_after?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_deductions_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_deductions_pass_id_fkey"
+            columns: ["pass_id"]
+            isOneToOne: false
+            referencedRelation: "passes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       site_content: {
         Row: {
           content_key: string
@@ -357,16 +405,27 @@ export type Database = {
         Args: { admin_name: string; new_user_id: string }
         Returns: boolean
       }
-      deduct_session_from_pass: {
-        Args: { p_user_id: string }
-        Returns: {
-          message: string
-          pass_id: string
-          pass_type: string
-          remaining_sessions: number
-          success: boolean
-        }[]
-      }
+      deduct_session_from_pass:
+        | {
+            Args: { p_user_id: string }
+            Returns: {
+              message: string
+              pass_id: string
+              pass_type: string
+              remaining_sessions: number
+              success: boolean
+            }[]
+          }
+        | {
+            Args: { p_booking_id?: string; p_user_id: string }
+            Returns: {
+              message: string
+              pass_id: string
+              pass_type: string
+              remaining_sessions: number
+              success: boolean
+            }[]
+          }
       expire_outdated_passes: { Args: never; Returns: undefined }
       has_role: {
         Args: {

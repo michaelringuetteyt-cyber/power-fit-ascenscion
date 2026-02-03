@@ -134,7 +134,7 @@ const AdminBookingsPage = () => {
     // If user has an account, deduct a session
     if (booking.user_id) {
       const { data, error: deductError } = await supabase
-        .rpc("deduct_session_from_pass", { p_user_id: booking.user_id });
+        .rpc("deduct_session_from_pass", { p_user_id: booking.user_id, p_booking_id: booking.id });
 
       if (deductError) {
         console.error("Deduction error:", deductError);

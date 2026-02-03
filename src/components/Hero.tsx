@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { ChevronDown } from "lucide-react";
 import heroCommunity from "@/assets/hero-community.png";
+import logo from "@/assets/logo.png";
 
 const Hero = () => {
   const scrollToBooking = () => {
@@ -26,19 +27,11 @@ const Hero = () => {
 
       {/* Content */}
       <div className="relative z-10 container mx-auto px-6 text-center">
-        {/* 3D Logo */}
+        {/* Logo */}
         <div className="mb-8 animate-slide-up tilt-3d">
           <div className="inline-flex items-center justify-center">
             <div className="relative glass-3d p-4 rounded-2xl">
-              <div className="w-24 h-24 md:w-32 md:h-32 border-4 border-foreground/80 rounded-b-3xl flex items-center justify-center bg-background/50 backdrop-blur-sm">
-                <div className="flex items-end gap-1">
-                  <div className="w-2 h-8 md:w-3 md:h-12 bg-foreground rounded-t-sm" />
-                  <div className="w-2 h-12 md:w-3 md:h-16 bg-foreground rounded-t-sm" />
-                  <div className="w-2 h-10 md:w-3 md:h-14 bg-primary rounded-t-sm" />
-                  <div className="w-2 h-12 md:w-3 md:h-16 bg-foreground rounded-t-sm" />
-                  <div className="w-2 h-8 md:w-3 md:h-12 bg-foreground rounded-t-sm" />
-                </div>
-              </div>
+              <img src={logo} alt="Power Fit Ascension" className="w-32 h-32 md:w-48 md:h-48 object-contain" />
             </div>
           </div>
         </div>

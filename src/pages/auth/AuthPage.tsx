@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, forwardRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ const signupSchema = authSchema.extend({
   path: ["confirmPassword"],
 });
 
-const AuthPage = () => {
+const AuthPage = forwardRef<HTMLDivElement>((_, ref) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLogin, setIsLogin] = useState(true);
@@ -175,7 +175,7 @@ const AuthPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div ref={ref} className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="absolute inset-0 hero-glow opacity-30" />
       
       <div className="w-full max-w-md relative">
@@ -306,6 +306,8 @@ const AuthPage = () => {
       </div>
     </div>
   );
-};
+});
+
+AuthPage.displayName = "AuthPage";
 
 export default AuthPage;

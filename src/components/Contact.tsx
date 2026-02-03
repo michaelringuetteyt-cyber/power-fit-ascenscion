@@ -24,7 +24,7 @@ const Contact = () => {
     {
       icon: Mail,
       title: "Email Coaching",
-      content: "coaching.powerfit.ascension@powerfitascension.com",
+      content: "Coachyilver-leloupquebecois@hotmail.com",
       subcontent: "Questions sur le coaching",
     },
     {

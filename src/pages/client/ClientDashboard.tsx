@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import ClientLayout from "@/components/client/ClientLayout";
+import TrialPassCard from "@/components/client/TrialPassCard";
 import { CalendarDays, Ticket, Receipt, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
@@ -36,6 +37,7 @@ const ClientDashboard = () => {
   const [upcomingBookings, setUpcomingBookings] = useState<Booking[]>([]);
   const [activePasses, setActivePasses] = useState<Pass[]>([]);
   const [recentPurchases, setRecentPurchases] = useState<Purchase[]>([]);
+  const [clientName, setClientName] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -51,7 +53,7 @@ const ClientDashboard = () => {
 
     const today = new Date().toISOString().split("T")[0];
 
-    const [bookingsRes, passesRes, purchasesRes] = await Promise.all([
+    const [bookingsRes, passesRes, purchasesRes, profileRes] = await Promise.all([
       supabase
         .from("bookings")
         .select("*")
@@ -71,11 +73,17 @@ const ClientDashboard = () => {
         .eq("user_id", user.id)
         .order("purchase_date", { ascending: false })
         .limit(3),
+      supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("user_id", user.id)
+        .maybeSingle(),
     ]);
 
     if (bookingsRes.data) setUpcomingBookings(bookingsRes.data);
     if (passesRes.data) setActivePasses(passesRes.data);
     if (purchasesRes.data) setRecentPurchases(purchasesRes.data);
+    if (profileRes.data) setClientName(profileRes.data.full_name || "");
     
     setLoading(false);
   };
@@ -129,6 +137,26 @@ const ClientDashboard = () => {
             Bienvenue dans votre espace client Power Fit
           </p>
         </div>
+
+        {/* Active Trial Pass - Show prominently */}
+        {activePasses.filter(p => p.pass_type === "trial" && p.remaining_sessions > 0).length > 0 && (
+          <div className="mb-8">
+            <h2 className="font-display text-xl mb-4 flex items-center gap-2">
+              <Ticket className="w-5 h-5 text-primary" />
+              Mon laissez-passer actif
+            </h2>
+            {activePasses
+              .filter(p => p.pass_type === "trial" && p.remaining_sessions > 0)
+              .map((pass) => (
+                <TrialPassCard
+                  key={pass.id}
+                  clientName={clientName}
+                  status={pass.status}
+                  remainingSessions={pass.remaining_sessions}
+                />
+              ))}
+          </div>
+        )}
 
         {/* Quick stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">

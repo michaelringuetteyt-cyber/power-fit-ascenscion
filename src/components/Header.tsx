@@ -39,8 +39,11 @@ const Header = () => {
       <div className="container mx-auto px-6">
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
-          <a href="#" className="flex items-center gap-2">
+          <a href="#" className="flex items-center gap-3">
             <img src={logo} alt="Power Fit Ascension" className="h-12 w-auto" />
+            <span className="font-display text-lg tracking-wider hidden sm:block">
+              POWER FIT <span className="text-primary">ASCENSION</span>
+            </span>
           </a>
 
           {/* Facebook Link */}

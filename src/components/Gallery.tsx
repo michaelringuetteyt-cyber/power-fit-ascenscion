@@ -1,30 +1,78 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import heroCommunity from "@/assets/hero-community.png";
 import galleryCommunity from "@/assets/gallery-community.png";
 
+interface GalleryItem {
+  id: string;
+  category: string;
+  image: string;
+  title: string;
+}
+
 const Gallery = () => {
   const [activeFilter, setActiveFilter] = useState("all");
+  const [dynamicItems, setDynamicItems] = useState<GalleryItem[]>([]);
 
   const filters = [
     { id: "all", label: "Tous" },
-    { id: "training", label: "Entraînements" },
+    { id: "training", label: "Entraînement" },
     { id: "community", label: "Communauté" },
     { id: "results", label: "Résultats" },
+    { id: "trainers", label: "Entraîneurs" },
   ];
 
-  // Gallery items with placeholder data
-  const galleryItems = [
-    { id: 1, category: "community", image: heroCommunity, title: "La famille Power Fit" },
-    { id: 2, category: "community", image: galleryCommunity, title: "Engagement & Motivation" },
-    { id: 3, category: "training", title: "Session Boxe Intense", color: "primary" },
-    { id: 4, category: "results", title: "Avant / Après", color: "secondary" },
-    { id: 5, category: "training", title: "Cardio HIIT", color: "primary" },
-    { id: 6, category: "results", title: "Transformation", color: "primary" },
+  // Default gallery items
+  const defaultItems: GalleryItem[] = [
+    { id: "default-1", category: "community", image: heroCommunity, title: "La famille Power Fit" },
+    { id: "default-2", category: "community", image: galleryCommunity, title: "Engagement & Motivation" },
   ];
+
+  useEffect(() => {
+    loadGalleryImages();
+  }, []);
+
+  const loadGalleryImages = async () => {
+    const { data } = await supabase
+      .from("site_content")
+      .select("*")
+      .eq("section", "gallery")
+      .eq("content_type", "image")
+      .order("created_at", { ascending: false });
+
+    if (data) {
+      const items: GalleryItem[] = data.map((item) => {
+        // Extract category from content_key (format: image_category_timestamp)
+        const parts = item.content_key.split("_");
+        const category = parts.length >= 3 ? parts[1] : "training";
+        
+        return {
+          id: item.id,
+          category,
+          image: item.content_value,
+          title: getCategoryLabel(category),
+        };
+      });
+      setDynamicItems(items);
+    }
+  };
+
+  const getCategoryLabel = (category: string): string => {
+    switch (category) {
+      case "training": return "Entraînement";
+      case "community": return "Communauté";
+      case "results": return "Résultats";
+      case "trainers": return "Entraîneurs";
+      default: return "Galerie";
+    }
+  };
+
+  // Combine default and dynamic items
+  const allItems = [...defaultItems, ...dynamicItems];
 
   const filteredItems = activeFilter === "all" 
-    ? galleryItems 
-    : galleryItems.filter(item => item.category === activeFilter);
+    ? allItems 
+    : allItems.filter(item => item.category === activeFilter);
 
   return (
     <section id="gallery" className="py-24 relative perspective-container">
@@ -60,39 +108,37 @@ const Gallery = () => {
         </div>
 
         {/* Gallery Grid with 3D */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          {filteredItems.map((item, index) => (
-            <div
-              key={item.id}
-              className={`relative aspect-square rounded-xl overflow-hidden group cursor-pointer card-3d ${
-                index === 0 ? "col-span-2 row-span-2" : ""
-              }`}
-              style={{ animationDelay: `${index * 0.1}s` }}
-            >
-              {item.image ? (
+        {filteredItems.length === 0 ? (
+          <div className="text-center py-16 text-muted-foreground">
+            <p className="text-lg">Aucune image dans cette catégorie</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {filteredItems.map((item, index) => (
+              <div
+                key={item.id}
+                className={`relative aspect-square rounded-xl overflow-hidden group cursor-pointer card-3d ${
+                  index === 0 ? "col-span-2 row-span-2" : ""
+                }`}
+                style={{ animationDelay: `${index * 0.1}s` }}
+              >
                 <img
                   src={item.image}
                   alt={item.title}
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                 />
-              ) : (
-                <div className={`w-full h-full ${
-                  item.color === "primary" 
-                    ? "bg-gradient-to-br from-primary/30 to-primary/10" 
-                    : "bg-gradient-to-br from-secondary/30 to-secondary/10"
-                }`} />
-              )}
-              
-              {/* Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              
-              {/* Title */}
-              <div className="absolute bottom-0 left-0 right-0 p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-300">
-                <h3 className="font-display text-xl tracking-wide">{item.title}</h3>
+                
+                {/* Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                
+                {/* Title */}
+                <div className="absolute bottom-0 left-0 right-0 p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-300">
+                  <h3 className="font-display text-xl tracking-wide">{item.title}</h3>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );

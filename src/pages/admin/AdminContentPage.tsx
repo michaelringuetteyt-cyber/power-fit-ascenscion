@@ -6,12 +6,18 @@ import {
   Image, 
   Upload, 
   Trash2, 
-  Save, 
   Plus,
   Loader2,
   CheckCircle
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface ContentItem {
   id: string;
@@ -25,9 +31,18 @@ interface ContentItem {
 const SECTIONS = [
   { id: "hero", label: "Hero / Accueil" },
   { id: "gallery", label: "Galerie" },
+  { id: "trainers", label: "Entraîneurs" },
   { id: "about", label: "À propos" },
   { id: "services", label: "Services" },
   { id: "contact", label: "Contact" },
+];
+
+const GALLERY_CATEGORIES = [
+  { id: "all", label: "Toutes catégories" },
+  { id: "training", label: "Entraînement" },
+  { id: "community", label: "Communauté" },
+  { id: "results", label: "Résultats" },
+  { id: "trainers", label: "Entraîneurs" },
 ];
 
 const AdminContentPage = () => {
@@ -36,6 +51,7 @@ const AdminContentPage = () => {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState("all");
 
   useEffect(() => {
     loadContent();
@@ -55,7 +71,7 @@ const AdminContentPage = () => {
     setLoading(false);
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, category?: string) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -80,10 +96,14 @@ const AdminContentPage = () => {
         .from("site-images")
         .getPublicUrl(fileName);
 
-      // Save to content table
+      // For gallery section, include category in content_key
+      const contentKey = activeSection === "gallery" && category 
+        ? `image_${category}_${Date.now()}` 
+        : `image_${Date.now()}`;
+
       await supabase.from("site_content").insert({
         section: activeSection,
-        content_key: `image_${Date.now()}`,
+        content_key: contentKey,
         content_type: "image",
         content_value: publicUrl,
       });
@@ -94,6 +114,8 @@ const AdminContentPage = () => {
       toast.error("Erreur: " + error.message);
     } finally {
       setUploading(false);
+      // Reset file input
+      e.target.value = "";
     }
   };
 
@@ -157,8 +179,27 @@ const AdminContentPage = () => {
     }
   };
 
+  // Extract category from content_key for gallery items
+  const getCategoryFromKey = (key: string): string => {
+    const parts = key.split("_");
+    if (parts.length >= 3 && GALLERY_CATEGORIES.some(c => c.id === parts[1])) {
+      return parts[1];
+    }
+    return "all";
+  };
+
+  const getCategoryLabel = (key: string): string => {
+    const category = getCategoryFromKey(key);
+    return GALLERY_CATEGORIES.find(c => c.id === category)?.label || "Non classé";
+  };
+
   const images = content.filter((c) => c.content_type === "image");
   const texts = content.filter((c) => c.content_type === "text");
+
+  // Filter images by category for gallery
+  const filteredImages = activeSection === "gallery" && selectedCategory !== "all"
+    ? images.filter(img => getCategoryFromKey(img.content_key) === selectedCategory)
+    : images;
 
   return (
     <AdminLayout>
@@ -177,7 +218,10 @@ const AdminContentPage = () => {
           {SECTIONS.map((section) => (
             <button
               key={section.id}
-              onClick={() => setActiveSection(section.id)}
+              onClick={() => {
+                setActiveSection(section.id);
+                setSelectedCategory("all");
+              }}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 activeSection === section.id
                   ? "bg-primary text-primary-foreground"
@@ -197,32 +241,98 @@ const AdminContentPage = () => {
           <div className="space-y-8">
             {/* Images Section */}
             <div className="dashboard-card">
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                 <h2 className="font-display text-xl flex items-center gap-2">
                   <Image className="w-5 h-5 text-primary" />
                   Images - {SECTIONS.find(s => s.id === activeSection)?.label}
                 </h2>
-                <label className="cursor-pointer">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
-                  <Button variant="hero" disabled={uploading} asChild>
-                    <span>
-                      {uploading ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <Upload className="w-4 h-4 mr-2" />
-                      )}
-                      Ajouter une image
-                    </span>
-                  </Button>
-                </label>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Category filter for gallery */}
+                  {activeSection === "gallery" && (
+                    <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Filtrer par catégorie" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {GALLERY_CATEGORIES.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>
+                            {cat.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+
+                  {/* Upload with category selection for gallery */}
+                  {activeSection === "gallery" ? (
+                    <div className="flex items-center gap-2">
+                      <Select 
+                        value={selectedCategory === "all" ? "training" : selectedCategory}
+                        onValueChange={(cat) => {
+                          const input = document.getElementById("gallery-upload") as HTMLInputElement;
+                          input?.setAttribute("data-category", cat);
+                        }}
+                      >
+                        <SelectTrigger className="w-[150px]">
+                          <SelectValue placeholder="Catégorie" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {GALLERY_CATEGORIES.filter(c => c.id !== "all").map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id}>
+                              {cat.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <label className="cursor-pointer">
+                        <input
+                          id="gallery-upload"
+                          type="file"
+                          accept="image/*"
+                          data-category={selectedCategory === "all" ? "training" : selectedCategory}
+                          onChange={(e) => {
+                            const cat = e.target.getAttribute("data-category") || "training";
+                            handleFileUpload(e, cat);
+                          }}
+                          className="hidden"
+                        />
+                        <Button variant="hero" disabled={uploading} asChild>
+                          <span>
+                            {uploading ? (
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            ) : (
+                              <Upload className="w-4 h-4 mr-2" />
+                            )}
+                            Ajouter
+                          </span>
+                        </Button>
+                      </label>
+                    </div>
+                  ) : (
+                    <label className="cursor-pointer">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleFileUpload(e)}
+                        className="hidden"
+                      />
+                      <Button variant="hero" disabled={uploading} asChild>
+                        <span>
+                          {uploading ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <Upload className="w-4 h-4 mr-2" />
+                          )}
+                          Ajouter une image
+                        </span>
+                      </Button>
+                    </label>
+                  )}
+                </div>
               </div>
 
-              {images.length === 0 ? (
+              {filteredImages.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Image className="w-16 h-16 mx-auto mb-4 opacity-50" />
                   <p>Aucune image pour cette section</p>
@@ -230,7 +340,7 @@ const AdminContentPage = () => {
                 </div>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {images.map((item) => (
+                  {filteredImages.map((item) => (
                     <div
                       key={item.id}
                       className="relative group aspect-square rounded-lg overflow-hidden bg-muted"
@@ -251,6 +361,11 @@ const AdminContentPage = () => {
                         </Button>
                       </div>
                       <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-background to-transparent">
+                        {activeSection === "gallery" && (
+                          <span className="inline-block px-2 py-0.5 bg-primary/20 text-primary text-xs rounded-full mb-1">
+                            {getCategoryLabel(item.content_key)}
+                          </span>
+                        )}
                         <p className="text-xs truncate">{item.content_key}</p>
                       </div>
                     </div>

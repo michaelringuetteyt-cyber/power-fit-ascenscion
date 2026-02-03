@@ -73,6 +73,7 @@ export type Database = {
           id: string
           status: string
           time_slot: string
+          user_id: string | null
         }
         Insert: {
           appointment_type: string
@@ -84,6 +85,7 @@ export type Database = {
           id?: string
           status?: string
           time_slot: string
+          user_id?: string | null
         }
         Update: {
           appointment_type?: string
@@ -95,8 +97,17 @@ export type Database = {
           id?: string
           status?: string
           time_slot?: string
+          user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "bookings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       chat_messages: {
         Row: {
@@ -160,6 +171,128 @@ export type Database = {
         }
         Relationships: []
       }
+      passes: {
+        Row: {
+          created_at: string
+          expiry_date: string | null
+          id: string
+          pass_type: string
+          purchase_date: string
+          remaining_sessions: number
+          status: string
+          total_sessions: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expiry_date?: string | null
+          id?: string
+          pass_type: string
+          purchase_date?: string
+          remaining_sessions: number
+          status?: string
+          total_sessions: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expiry_date?: string | null
+          id?: string
+          pass_type?: string
+          purchase_date?: string
+          remaining_sessions?: number
+          status?: string
+          total_sessions?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "passes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          phone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email: string
+          full_name?: string
+          id?: string
+          phone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          phone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      purchases: {
+        Row: {
+          amount: number
+          id: string
+          item_name: string
+          pass_id: string | null
+          payment_status: string
+          purchase_date: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          id?: string
+          item_name: string
+          pass_id?: string | null
+          payment_status?: string
+          purchase_date?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          id?: string
+          item_name?: string
+          pass_id?: string | null
+          payment_status?: string
+          purchase_date?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchases_pass_id_fkey"
+            columns: ["pass_id"]
+            isOneToOne: false
+            referencedRelation: "passes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchases_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       site_content: {
         Row: {
           content_key: string
@@ -190,6 +323,27 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -203,9 +357,17 @@ export type Database = {
         Args: { admin_name: string; new_user_id: string }
         Returns: boolean
       }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_admin: { Args: never; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "client"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -332,6 +494,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "client"],
+    },
   },
 } as const

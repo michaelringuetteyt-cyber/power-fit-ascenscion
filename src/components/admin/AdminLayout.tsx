@@ -11,7 +11,8 @@ import {
   Menu, 
   X,
   ArrowLeft,
-  CalendarDays
+  CalendarDays,
+  Users
 } from "lucide-react";
 import { User } from "@supabase/supabase-js";
 
@@ -190,6 +191,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
     { path: "/admin/chat", icon: MessageCircle, label: "Messages", badge: unreadCount },
     { path: "/admin/bookings", icon: CalendarDays, label: "Réservations" },
     { path: "/admin/content", icon: Image, label: "Contenu" },
+    { path: "/admin/users", icon: Users, label: "Utilisateurs" },
   ];
 
   if (loading) {

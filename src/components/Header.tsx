@@ -1,11 +1,23 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Facebook } from "lucide-react";
+import { Menu, X, Facebook, User, LogOut } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import logo from "@/assets/logo.png";
 
 const Header = () => {
+  const navigate = useNavigate();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -14,6 +26,43 @@ const Header = () => {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          checkAdminStatus(session.user.id);
+        } else {
+          setIsAdmin(false);
+        }
+      }
+    );
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        checkAdminStatus(session.user.id);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const checkAdminStatus = async (userId: string) => {
+    const { data } = await supabase
+      .from("admin_users")
+      .select("id")
+      .eq("user_id", userId)
+      .maybeSingle();
+    setIsAdmin(!!data);
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setIsAdmin(false);
+  };
 
   const navLinks = [
     { href: "#about", label: "Approche" },
@@ -68,8 +117,53 @@ const Header = () => {
             ))}
           </nav>
 
-          {/* CTA Button */}
-          <div className="hidden lg:block">
+          {/* Auth & CTA Buttons */}
+          <div className="hidden lg:flex items-center gap-3">
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <User className="w-4 h-4" />
+                    Mon espace
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={() => navigate("/client")}>
+                    Tableau de bord
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/client/profile")}>
+                    Mon profil
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/client/bookings")}>
+                    Mes réservations
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/client/passes")}>
+                    Mes laissez-passer
+                  </DropdownMenuItem>
+                  {isAdmin && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => navigate("/admin")}>
+                        Administration
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Déconnexion
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate("/auth")}
+              >
+                Connexion
+              </Button>
+            )}
             <Button
               variant="hero"
               size="default"
@@ -105,6 +199,52 @@ const Header = () => {
                   {link.label}
                 </button>
               ))}
+              
+              {user ? (
+                <>
+                  <button
+                    onClick={() => {
+                      navigate("/client");
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="text-lg font-medium text-primary hover:text-primary/80 transition-colors text-left"
+                  >
+                    Mon espace
+                  </button>
+                  {isAdmin && (
+                    <button
+                      onClick={() => {
+                        navigate("/admin");
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className="text-lg font-medium text-muted-foreground hover:text-foreground transition-colors text-left"
+                    >
+                      Administration
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      handleLogout();
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="text-lg font-medium text-destructive hover:text-destructive/80 transition-colors text-left"
+                  >
+                    Déconnexion
+                  </button>
+                </>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    navigate("/auth");
+                    setIsMobileMenuOpen(false);
+                  }}
+                >
+                  Connexion
+                </Button>
+              )}
+              
               <Button
                 variant="hero"
                 size="lg"

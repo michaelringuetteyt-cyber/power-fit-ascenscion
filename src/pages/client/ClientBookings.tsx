@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, forwardRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import ClientLayout from "@/components/client/ClientLayout";
@@ -17,7 +17,7 @@ interface Booking {
   created_at: string;
 }
 
-const ClientBookings = () => {
+const ClientBookings = forwardRef<HTMLDivElement>((_, ref) => {
   const navigate = useNavigate();
   const [upcomingBookings, setUpcomingBookings] = useState<Booking[]>([]);
   const [pastBookings, setPastBookings] = useState<Booking[]>([]);
@@ -121,7 +121,7 @@ const ClientBookings = () => {
 
   return (
     <ClientLayout>
-      <div className="p-6 lg:p-8">
+      <div ref={ref} className="p-6 lg:p-8">
         <div className="mb-8">
           <h1 className="font-display text-3xl lg:text-4xl mb-2">
             Mes réservations
@@ -164,6 +164,8 @@ const ClientBookings = () => {
       </div>
     </ClientLayout>
   );
-};
+});
+
+ClientBookings.displayName = "ClientBookings";
 
 export default ClientBookings;

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, forwardRef } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -30,7 +30,7 @@ interface Pass {
   status: string;
 }
 
-const ClientLayout = ({ children }: ClientLayoutProps) => {
+const ClientLayout = forwardRef<HTMLDivElement, ClientLayoutProps>(({ children }, ref) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -92,7 +92,7 @@ const ClientLayout = ({ children }: ClientLayoutProps) => {
   const isActive = (href: string) => location.pathname === href;
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div ref={ref} className="min-h-screen bg-background flex">
       {/* Mobile sidebar backdrop */}
       {isSidebarOpen && (
         <div
@@ -208,6 +208,8 @@ const ClientLayout = ({ children }: ClientLayoutProps) => {
       </main>
     </div>
   );
-};
+});
+
+ClientLayout.displayName = "ClientLayout";
 
 export default ClientLayout;

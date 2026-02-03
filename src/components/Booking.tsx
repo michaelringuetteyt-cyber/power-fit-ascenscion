@@ -520,25 +520,33 @@ const Booking = () => {
                     <div className="p-6 rounded-xl bg-orange-500/10 border border-orange-500/30">
                       <div className="flex items-start gap-4">
                         <div className="w-12 h-12 rounded-xl bg-orange-500/20 flex items-center justify-center flex-shrink-0">
-                          <Ticket className="w-6 h-6 text-orange-500" />
+                          <AlertCircle className="w-6 h-6 text-orange-500" />
                         </div>
                         <div className="flex-1">
-                          <h4 className="font-display text-lg mb-2">Essai déjà utilisé</h4>
+                          <h4 className="font-display text-lg mb-2 text-orange-400">Cours d'essai déjà utilisé</h4>
+                          <p className="text-sm text-foreground mb-2 font-medium">
+                            ⚠️ Un seul cours d'essai gratuit est disponible par personne.
+                          </p>
                           <p className="text-sm text-muted-foreground mb-4">
-                            Vous avez déjà bénéficié de votre cours d'essai gratuit.
-                            Pour continuer votre entraînement, découvrez nos offres :
+                            Vous avez déjà bénéficié de votre essai gratuit avec ce compte.
+                            Pour continuer votre entraînement, découvrez nos offres avantageuses :
                           </p>
                           <ul className="text-sm text-muted-foreground mb-4 space-y-1">
                             <li>• Carte de 5 cours</li>
                             <li>• Carte de 10 cours</li>
-                            <li>• Abonnement mensuel</li>
+                            <li>• Abonnement mensuel illimité</li>
                           </ul>
                           <div className="flex flex-col sm:flex-row gap-3">
                             <Button 
                               variant="hero"
                               onClick={() => {
                                 const pricingSection = document.getElementById("pricing");
-                                pricingSection?.scrollIntoView({ behavior: "smooth" });
+                                if (pricingSection) {
+                                  pricingSection.scrollIntoView({ behavior: "smooth" });
+                                } else {
+                                  const contactSection = document.getElementById("contact");
+                                  contactSection?.scrollIntoView({ behavior: "smooth" });
+                                }
                               }}
                             >
                               <ShoppingBag className="w-4 h-4 mr-2" />

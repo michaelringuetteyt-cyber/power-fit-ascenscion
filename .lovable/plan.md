@@ -1,145 +1,145 @@
 
-# Plan: Confirmation automatique des achats Square et ajout des laissez-passer
+# Plan: Gestion manuelle des passes par l'admin avec déduction automatique
 
 ## Objectif
-Quand un client achète une carte de cours via Square (5 cours, 10 cours, accès mensuel, engagement 12 mois), le système doit automatiquement :
-1. Confirmer l'achat et l'enregistrer dans la table `purchases`
-2. Créer un laissez-passer correspondant dans la table `passes` du client
+1. L'admin peut attribuer manuellement des laissez-passer aux clients depuis le panneau admin
+2. À chaque réservation confirmée, une séance est automatiquement déduite du laissez-passer actif du client
 
 ---
 
-## Approche technique
+## Partie 1: Panneau Admin - Attribution des passes
 
-### Le défi avec Square
-Les liens Square actuels (`https://square.link/...`) sont des liens de paiement externes. Pour recevoir une confirmation de paiement, nous devons :
-1. Utiliser les **webhooks Square** pour recevoir les notifications de paiement
-2. Créer une **Edge Function** pour traiter ces notifications
-3. Lier le paiement au bon client
+### Modifications de `AdminUsersPage.tsx`
 
-### Architecture proposée
+Ajouter un nouvel onglet "Passes" dans la page admin des utilisateurs avec les fonctionnalités suivantes :
+
+**1. Liste des clients avec leurs passes**
+- Afficher chaque client avec son nombre de séances restantes
+- Bouton "Attribuer un pass" par client
+
+**2. Modal d'attribution de pass**
+- Sélection du type de pass :
+  - Carte de 5 cours (5 séances)
+  - Carte de 10 cours (10 séances)
+  - Accès mensuel (999 séances, expire dans 30 jours)
+  - Engagement 12 mois (999 séances, expire dans 365 jours)
+- Montant de l'achat (pour l'historique)
+- Création automatique dans les tables `purchases` et `passes`
+
+**3. Visualisation des passes existants**
+- Liste des passes actifs par client
+- Possibilité de modifier le nombre de séances restantes
+- Historique des achats
+
+---
+
+## Partie 2: Déduction automatique à la réservation
+
+### Nouvelle fonction base de données
+
+Créer une fonction `deduct_session_on_booking()` qui sera appelée après chaque réservation confirmée :
 
 ```text
-Client connecté → Clique sur lien Square → Paie sur Square
-                                              ↓
-Square envoie webhook → Edge Function "square-webhook"
-                              ↓
-                        Vérifie le paiement
-                              ↓
-                        Identifie le client (via email)
-                              ↓
-                        Crée l'achat (purchases)
-                              ↓
-                        Crée le laissez-passer (passes)
+1. Vérifier si le booking a un user_id
+2. Trouver le pass actif le plus prioritaire :
+   - Passes avec expiration proche en premier
+   - Puis passes avec le moins de séances
+3. Déduire 1 séance
+4. Si remaining_sessions = 0 → status = 'used'
+5. Vérifier les expirations
+```
+
+### Trigger automatique (optionnel)
+
+Option A: Trigger à l'insertion d'un booking
+- Déduction automatique quand `status = 'confirmed'` et `user_id` est présent
+
+Option B: Appel manuel depuis le code
+- L'admin confirme une réservation → déduction
+- Plus de contrôle mais nécessite une action manuelle
+
+**Approche recommandée : Option B** - L'admin confirme les réservations depuis le panneau, ce qui déclenche la déduction.
+
+---
+
+## Partie 3: Confirmation de réservation par l'admin
+
+### Modifications de `AdminBookingsPage.tsx`
+
+Ajouter un bouton "Confirmer" sur chaque réservation en attente :
+- Change le status de `pending` à `confirmed`
+- Appelle la fonction de déduction de séance
+- Affiche le nombre de séances restantes après déduction
+- Notification si le client n'a pas de pass actif
+
+---
+
+## Partie 4: Flux utilisateur complet
+
+```text
+Client achète une carte chez Square
+        ↓
+Admin reçoit notification de paiement (hors système)
+        ↓
+Admin va sur /admin/users → Onglet "Passes"
+        ↓
+Sélectionne le client → "Attribuer un pass"
+        ↓
+Choisit le type (5 cours, 10 cours, mensuel, annuel)
+        ↓
+Pass créé + Achat enregistré
+        ↓
+Client réserve un cours d'essai/session
+        ↓
+Admin confirme la réservation depuis /admin/bookings
+        ↓
+1 séance déduite automatiquement du pass actif
+        ↓
+Client voit ses séances mises à jour dans son espace
 ```
 
 ---
 
-## Partie 1: Edge Function pour les webhooks Square
+## Fichiers à modifier
 
-### Fichier: `supabase/functions/square-webhook/index.ts`
+### 1. `src/pages/admin/AdminUsersPage.tsx`
+- Ajout d'un onglet "Gestion des passes"
+- Liste des clients avec solde de séances
+- Modal d'attribution de pass
+- Formulaire : type de pass, montant, confirmation
 
-Cette fonction recevra les notifications de Square quand un paiement est complété :
+### 2. `src/pages/admin/AdminBookingsPage.tsx`
+- Bouton "Confirmer" sur les réservations pending
+- Indicateur du nombre de séances restantes
+- Alerte si pas de pass actif
 
-- Vérifie la signature du webhook (sécurité)
-- Extrait les informations de paiement (montant, email client, produit acheté)
-- Recherche le client dans `profiles` par email
-- Crée un enregistrement dans `purchases`
-- Crée le laissez-passer correspondant dans `passes`
-
-### Mapping des produits Square → Laissez-passer
-
-| Produit Square | pass_type | total_sessions | expiry_date |
-|----------------|-----------|----------------|-------------|
-| Carte de 5 cours | 5_sessions | 5 | null (pas d'expiration) |
-| Carte de 10 cours | 10_sessions | 10 | null |
-| Accès mensuel | monthly | 999 (illimité) | +30 jours |
-| Engagement 12 mois | yearly | 999 (illimité) | +365 jours |
+### 3. Migration base de données
+- Fonction `deduct_session_from_pass(user_id uuid)` pour gérer la logique de déduction
+- Mise à jour RLS si nécessaire pour permettre les inserts admin
 
 ---
 
-## Partie 2: Configuration Square requise
+## Structure de l'interface admin
 
-Pour que cela fonctionne, il faudra :
-
-1. **Créer un webhook dans Square Dashboard** :
-   - URL: `https://fhwnmfarcultpaaqptej.supabase.co/functions/v1/square-webhook`
-   - Événement: `payment.completed`
-
-2. **Ajouter les secrets** :
-   - `SQUARE_WEBHOOK_SIGNATURE_KEY` : pour vérifier l'authenticité des webhooks
-   - `SQUARE_ACCESS_TOKEN` : (optionnel) pour vérifier les paiements via l'API
-
----
-
-## Partie 3: Modification du flux utilisateur
-
-### Option A: Lien Square personnalisé (recommandé)
-Modifier les liens Square pour inclure l'email du client connecté dans les métadonnées :
-
-1. Quand un client connecté clique sur un lien d'achat
-2. On redirige vers Square avec son email en paramètre
-3. Square inclut cet email dans le webhook
-4. L'Edge Function peut ainsi identifier le client
-
-### Option B: Correspondance par email
-- Le client entre son email lors du paiement Square
-- L'Edge Function cherche ce même email dans `profiles`
-- Si trouvé, le pass est ajouté automatiquement
-
----
-
-## Partie 4: Composant d'achat amélioré
-
-### Modifications de `Services.tsx`
-
-Pour les clients connectés :
-- Afficher un message "Vous êtes connecté - votre achat sera lié à votre compte"
-- Générer des liens Square personnalisés avec l'email du client
-
-Pour les visiteurs non connectés :
-- Afficher un message "Connectez-vous pour que votre achat soit automatiquement ajouté à votre compte"
-- Les achats sans compte seront traités manuellement par l'admin
-
----
-
-## Partie 5: Gestion admin des passes (bonus)
-
-Ajouter une section dans l'admin pour :
-- Voir les achats en attente de liaison (client non trouvé)
-- Attribuer manuellement un pass à un client
-- Consulter l'historique des achats automatiques
-
----
-
-## Fichiers à créer/modifier
-
-### Nouveaux fichiers
-1. `supabase/functions/square-webhook/index.ts` - Edge Function pour recevoir les webhooks
-
-### Fichiers modifiés
-1. `src/components/Services.tsx` - Liens personnalisés pour clients connectés
-2. `src/pages/admin/AdminUsersPage.tsx` - Section gestion des passes (optionnel)
-
----
-
-## Prérequis
-
-Avant l'implémentation, vous devrez :
-
-1. **Configurer Square** :
-   - Accéder à votre tableau de bord Square Developer
-   - Créer une application si pas déjà fait
-   - Configurer le webhook vers l'URL de l'Edge Function
-   - Récupérer la clé de signature du webhook
-
-2. **Ajouter les secrets** :
-   - `SQUARE_WEBHOOK_SIGNATURE_KEY`
+```text
+/admin/users
+├── Onglet "Administrateurs" (existant)
+├── Onglet "Clients" (existant)
+└── Onglet "Passes" (nouveau)
+    ├── Tableau des clients
+    │   ├── Nom | Email | Séances restantes | Actions
+    │   └── [Attribuer un pass] [Voir historique]
+    └── Modal Attribution
+        ├── Type de pass (dropdown)
+        ├── Montant (input)
+        └── [Confirmer]
+```
 
 ---
 
 ## Résumé des livrables
 
-1. **Edge Function** : `square-webhook` pour recevoir et traiter les paiements
-2. **Mise à jour Services.tsx** : Liens personnalisés pour clients connectés
-3. **Configuration secrets** : Clé de signature Square
-4. **Documentation** : Instructions pour configurer le webhook Square
+1. **AdminUsersPage.tsx** : Nouvel onglet pour gérer les passes des clients
+2. **AdminBookingsPage.tsx** : Confirmation de réservation avec déduction automatique
+3. **Fonction SQL** : `deduct_session_from_pass()` pour la logique métier
+4. **Pas besoin d'intégration Square** : Gestion 100% manuelle par l'admin

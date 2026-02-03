@@ -42,6 +42,7 @@ export type Database = {
           date: string
           id: string
           is_active: boolean
+          max_bookings: number
           time_slots: string[]
         }
         Insert: {
@@ -50,6 +51,7 @@ export type Database = {
           date: string
           id?: string
           is_active?: boolean
+          max_bookings?: number
           time_slots?: string[]
         }
         Update: {
@@ -58,6 +60,7 @@ export type Database = {
           date?: string
           id?: string
           is_active?: boolean
+          max_bookings?: number
           time_slots?: string[]
         }
         Relationships: []

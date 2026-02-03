@@ -3,6 +3,10 @@ import { Button } from "@/components/ui/button";
 
 const offers = [
   {
+    name: "1 seul cours",
+    link: "https://square.link/u/0dC4BjPo",
+  },
+  {
     name: "Carte de 5 cours",
     link: "https://square.link/u/SYGFSved",
   },
@@ -134,7 +138,7 @@ const Services = () => {
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
                     Nos formules
                   </p>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {offers.map((offer) => (
                       <a
                         key={offer.name}

@@ -28,7 +28,10 @@ import {
   User,
   Calendar,
   DollarSign,
-  Edit
+  Edit,
+  Upload,
+  Download,
+  X
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -90,6 +93,9 @@ const ClientNotesInvoices = () => {
     status: "pending",
   });
   const [savingInvoice, setSavingInvoice] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [existingFileUrl, setExistingFileUrl] = useState<string | null>(null);
 
   useEffect(() => {
     loadClients();
@@ -218,6 +224,8 @@ const ClientNotesInvoices = () => {
       due_date: "",
       status: "pending",
     });
+    setSelectedFile(null);
+    setExistingFileUrl(null);
     setInvoiceDialogOpen(true);
   };
 
@@ -231,7 +239,81 @@ const ClientNotesInvoices = () => {
       due_date: invoice.due_date || "",
       status: invoice.status,
     });
+    setSelectedFile(null);
+    setExistingFileUrl(invoice.file_url);
     setInvoiceDialogOpen(true);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.type !== "application/pdf") {
+        toast({ title: "Erreur", description: "Seuls les fichiers PDF sont acceptés", variant: "destructive" });
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        toast({ title: "Erreur", description: "Le fichier ne doit pas dépasser 10 Mo", variant: "destructive" });
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };
+
+  const uploadFile = async (invoiceId: string): Promise<string | null> => {
+    if (!selectedFile) return existingFileUrl;
+    
+    setUploadingFile(true);
+    const fileExt = selectedFile.name.split('.').pop();
+    const filePath = `${selectedClient}/${invoiceId}.${fileExt}`;
+    
+    // Delete old file if exists
+    if (existingFileUrl) {
+      const oldPath = existingFileUrl.split('/invoice-files/')[1];
+      if (oldPath) {
+        await supabase.storage.from('invoice-files').remove([oldPath]);
+      }
+    }
+    
+    const { error } = await supabase.storage
+      .from('invoice-files')
+      .upload(filePath, selectedFile, { upsert: true });
+    
+    setUploadingFile(false);
+    
+    if (error) {
+      console.error('Upload error:', error);
+      toast({ title: "Erreur", description: "Impossible d'uploader le fichier", variant: "destructive" });
+      return existingFileUrl;
+    }
+    
+    const { data: { publicUrl } } = supabase.storage
+      .from('invoice-files')
+      .getPublicUrl(filePath);
+    
+    return filePath; // Store the path, not the public URL since bucket is private
+  };
+
+  const getSignedUrl = async (filePath: string): Promise<string | null> => {
+    const { data, error } = await supabase.storage
+      .from('invoice-files')
+      .createSignedUrl(filePath, 3600); // 1 hour expiry
+    
+    if (error) {
+      console.error('Signed URL error:', error);
+      return null;
+    }
+    return data.signedUrl;
+  };
+
+  const handleDownloadInvoice = async (invoice: ClientInvoice) => {
+    if (!invoice.file_url) return;
+    
+    const signedUrl = await getSignedUrl(invoice.file_url);
+    if (signedUrl) {
+      window.open(signedUrl, '_blank');
+    } else {
+      toast({ title: "Erreur", description: "Impossible de télécharger le fichier", variant: "destructive" });
+    }
   };
 
   const handleSaveInvoice = async () => {
@@ -250,9 +332,12 @@ const ClientNotesInvoices = () => {
     };
     
     if (editingInvoice) {
+      // Upload file first if selected
+      const fileUrl = await uploadFile(editingInvoice.id);
+      
       const { error } = await supabase
         .from("client_invoices")
-        .update(payload)
+        .update({ ...payload, file_url: fileUrl })
         .eq("id", editingInvoice.id);
       
       if (error) {
@@ -262,23 +347,37 @@ const ClientNotesInvoices = () => {
         loadClientData(selectedClient);
       }
     } else {
-      const { error } = await supabase
+      // Insert first to get the ID
+      const { data: newInvoice, error } = await supabase
         .from("client_invoices")
         .insert({
           ...payload,
           user_id: selectedClient,
           created_by: user?.id,
-        });
+        })
+        .select()
+        .single();
       
-      if (error) {
+      if (error || !newInvoice) {
         toast({ title: "Erreur", description: "Impossible d'ajouter la facture", variant: "destructive" });
       } else {
+        // Upload file if selected
+        if (selectedFile) {
+          const fileUrl = await uploadFile(newInvoice.id);
+          if (fileUrl) {
+            await supabase
+              .from("client_invoices")
+              .update({ file_url: fileUrl })
+              .eq("id", newInvoice.id);
+          }
+        }
         toast({ title: "Facture ajoutée" });
         loadClientData(selectedClient);
       }
     }
     
     setSavingInvoice(false);
+    setSelectedFile(null);
     setInvoiceDialogOpen(false);
   };
 
@@ -528,6 +627,49 @@ const ClientNotesInvoices = () => {
                           </SelectContent>
                         </Select>
                       </div>
+                      
+                      {/* File Upload Section */}
+                      <div className="space-y-2">
+                        <Label>Fichier PDF (optionnel)</Label>
+                        {(selectedFile || existingFileUrl) ? (
+                          <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border border-border">
+                            <FileText className="w-5 h-5 text-primary" />
+                            <span className="text-sm flex-1 truncate">
+                              {selectedFile?.name || "Fichier existant"}
+                            </span>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => {
+                                setSelectedFile(null);
+                                setExistingFileUrl(null);
+                              }}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="relative">
+                            <Input
+                              type="file"
+                              accept=".pdf,application/pdf"
+                              onChange={handleFileChange}
+                              className="hidden"
+                              id="invoice-file-upload"
+                            />
+                            <label 
+                              htmlFor="invoice-file-upload"
+                              className="flex items-center justify-center gap-2 p-4 rounded-lg border-2 border-dashed border-border hover:border-primary/50 cursor-pointer transition-colors"
+                            >
+                              <Upload className="w-5 h-5 text-muted-foreground" />
+                              <span className="text-sm text-muted-foreground">
+                                Cliquez pour ajouter un PDF (max 10 Mo)
+                              </span>
+                            </label>
+                          </div>
+                        )}
+                      </div>
+
                       <div className="flex gap-2 justify-end">
                         <Button variant="outline" onClick={() => setInvoiceDialogOpen(false)}>
                           Annuler
@@ -535,9 +677,9 @@ const ClientNotesInvoices = () => {
                         <Button 
                           variant="hero" 
                           onClick={handleSaveInvoice} 
-                          disabled={savingInvoice || !invoiceData.invoice_number || !invoiceData.amount}
+                          disabled={savingInvoice || uploadingFile || !invoiceData.invoice_number || !invoiceData.amount}
                         >
-                          {savingInvoice ? "Enregistrement..." : "Enregistrer"}
+                          {uploadingFile ? "Upload..." : savingInvoice ? "Enregistrement..." : "Enregistrer"}
                         </Button>
                       </div>
                     </div>
@@ -560,6 +702,7 @@ const ClientNotesInvoices = () => {
                         <th className="pb-3 font-medium">Description</th>
                         <th className="pb-3 font-medium">Montant</th>
                         <th className="pb-3 font-medium">Statut</th>
+                        <th className="pb-3 font-medium">PDF</th>
                         <th className="pb-3 font-medium"></th>
                       </tr>
                     </thead>
@@ -589,6 +732,20 @@ const ClientNotesInvoices = () => {
                           </td>
                           <td className="py-3">
                             {getStatusBadge(invoice.status)}
+                          </td>
+                          <td className="py-3">
+                            {invoice.file_url ? (
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                className="text-primary hover:text-primary"
+                                onClick={() => handleDownloadInvoice(invoice)}
+                              >
+                                <Download className="w-4 h-4" />
+                              </Button>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">—</span>
+                            )}
                           </td>
                           <td className="py-3">
                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

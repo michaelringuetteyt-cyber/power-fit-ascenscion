@@ -210,6 +210,8 @@ const Booking = () => {
     { id: "coaching", label: "Session coaching", icon: "🏆", showCalendar: false },
   ];
 
+  const TYPEFORM_URL = "https://form.typeform.com/to/bfrqdD5j";
+
   const handlePrevMonth = () => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
   };
@@ -271,6 +273,12 @@ const Booking = () => {
       if (userId) {
         checkTrialEligibility(userId);
       }
+      return;
+    }
+    
+    // For consultation and coaching, redirect to Typeform
+    if (type.id === "consultation" || type.id === "coaching") {
+      window.open(TYPEFORM_URL, "_blank");
       return;
     }
     
@@ -476,7 +484,7 @@ const Booking = () => {
                         <span className="text-3xl mb-4 block">{type.icon}</span>
                         <span className="font-medium">{type.label}</span>
                         {!type.showCalendar && (
-                          <span className="block text-xs text-muted-foreground mt-2">Nous contacter</span>
+                          <span className="block text-xs text-muted-foreground mt-2">Remplir le formulaire →</span>
                         )}
                       </button>
                     ))}

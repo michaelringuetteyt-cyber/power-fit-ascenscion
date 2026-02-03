@@ -58,6 +58,8 @@ const ClientPasses = () => {
 
   const getPassTypeLabel = (type: string) => {
     switch (type) {
+      case "trial":
+        return "Cours d'essai";
       case "5_sessions":
         return "5 Séances";
       case "10_sessions":
@@ -73,6 +75,8 @@ const ClientPasses = () => {
     switch (type) {
       case "monthly":
         return <Calendar className="w-6 h-6 text-secondary" />;
+      case "trial":
+        return <Ticket className="w-6 h-6 text-green-500" />;
       default:
         return <Ticket className="w-6 h-6 text-primary" />;
     }

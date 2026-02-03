@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Calendar, Clock, User, Mail, Phone, ChevronLeft, ChevronRight, Check, AlertCircle, MapPin, LogIn } from "lucide-react";
+import { Calendar, Clock, User, Mail, Phone, ChevronLeft, ChevronRight, Check, AlertCircle, MapPin, LogIn, Ticket, ShoppingBag } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
@@ -25,6 +25,13 @@ interface Profile {
   phone: string | null;
 }
 
+interface TrialEligibility {
+  checked: boolean;
+  eligible: boolean;
+  passId?: string;
+  checking: boolean;
+}
+
 const Booking = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
@@ -37,6 +44,11 @@ const Booking = () => {
   const [showContactInfo, setShowContactInfo] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [trialEligibility, setTrialEligibility] = useState<TrialEligibility>({
+    checked: false,
+    eligible: false,
+    checking: false,
+  });
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -206,8 +218,62 @@ const Booking = () => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
   };
 
+  const checkTrialEligibility = async (uid: string) => {
+    setTrialEligibility(prev => ({ ...prev, checking: true }));
+    
+    const { data, error } = await supabase.rpc('create_trial_pass_if_eligible', {
+      p_user_id: uid
+    });
+
+    if (error) {
+      console.error("Error checking trial eligibility:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de vérifier votre éligibilité au cours d'essai.",
+        variant: "destructive",
+      });
+      setTrialEligibility({ checked: true, eligible: false, checking: false });
+      return;
+    }
+
+    const result = data?.[0];
+    if (result?.success) {
+      setTrialEligibility({
+        checked: true,
+        eligible: true,
+        passId: result.pass_id,
+        checking: false,
+      });
+      toast({
+        title: "Pass d'essai attribué !",
+        description: "Votre cours d'essai gratuit a été activé. Choisissez maintenant votre créneau.",
+      });
+      setStep(2);
+    } else {
+      setTrialEligibility({
+        checked: true,
+        eligible: false,
+        checking: false,
+      });
+    }
+  };
+
   const handleTypeSelect = (type: typeof appointmentTypes[0]) => {
     setFormData({ ...formData, type: type.id });
+    
+    if (type.id === "trial") {
+      // Trial requires authentication
+      if (!isLoggedIn) {
+        // Will show login prompt, don't advance step
+        return;
+      }
+      // User is logged in, check eligibility
+      if (userId) {
+        checkTrialEligibility(userId);
+      }
+      return;
+    }
+    
     if (type.showCalendar) {
       setShowContactInfo(false);
       setStep(2);
@@ -400,11 +466,12 @@ const Booking = () => {
                       <button
                         key={type.id}
                         onClick={() => handleTypeSelect(type)}
+                        disabled={trialEligibility.checking}
                         className={`p-6 rounded-xl border transition-all duration-300 text-left hover:border-primary/50 ${
                           formData.type === type.id 
                             ? "border-primary bg-primary/10" 
                             : "border-border bg-card"
-                        }`}
+                        } ${trialEligibility.checking ? "opacity-50 cursor-wait" : ""}`}
                       >
                         <span className="text-3xl mb-4 block">{type.icon}</span>
                         <span className="font-medium">{type.label}</span>
@@ -414,6 +481,92 @@ const Booking = () => {
                       </button>
                     ))}
                   </div>
+
+                  {/* Trial login prompt - shown when trial is selected but user not logged in */}
+                  {formData.type === "trial" && !isLoggedIn && (
+                    <div className="p-6 rounded-xl bg-primary/10 border border-primary/30">
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
+                          <LogIn className="w-6 h-6 text-primary" />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-display text-lg mb-2">Connexion requise</h4>
+                          <p className="text-sm text-muted-foreground mb-4">
+                            Pour réserver votre cours d'essai gratuit, vous devez être connecté à votre compte.
+                            Cela nous permet de vous garantir un seul essai gratuit par client.
+                          </p>
+                          <div className="flex flex-col sm:flex-row gap-3">
+                            <Button 
+                              variant="hero"
+                              onClick={() => navigate("/auth?redirect=/#booking")}
+                            >
+                              <LogIn className="w-4 h-4 mr-2" />
+                              Se connecter
+                            </Button>
+                            <Button 
+                              variant="outline"
+                              onClick={() => navigate("/auth?redirect=/#booking")}
+                            >
+                              Créer un compte
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Trial already used message */}
+                  {formData.type === "trial" && isLoggedIn && trialEligibility.checked && !trialEligibility.eligible && (
+                    <div className="p-6 rounded-xl bg-orange-500/10 border border-orange-500/30">
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-orange-500/20 flex items-center justify-center flex-shrink-0">
+                          <Ticket className="w-6 h-6 text-orange-500" />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-display text-lg mb-2">Essai déjà utilisé</h4>
+                          <p className="text-sm text-muted-foreground mb-4">
+                            Vous avez déjà bénéficié de votre cours d'essai gratuit.
+                            Pour continuer votre entraînement, découvrez nos offres :
+                          </p>
+                          <ul className="text-sm text-muted-foreground mb-4 space-y-1">
+                            <li>• Carte de 5 cours</li>
+                            <li>• Carte de 10 cours</li>
+                            <li>• Abonnement mensuel</li>
+                          </ul>
+                          <div className="flex flex-col sm:flex-row gap-3">
+                            <Button 
+                              variant="hero"
+                              onClick={() => {
+                                const pricingSection = document.getElementById("pricing");
+                                pricingSection?.scrollIntoView({ behavior: "smooth" });
+                              }}
+                            >
+                              <ShoppingBag className="w-4 h-4 mr-2" />
+                              Voir les offres
+                            </Button>
+                            <Button 
+                              variant="outline"
+                              onClick={() => {
+                                const contactSection = document.getElementById("contact");
+                                contactSection?.scrollIntoView({ behavior: "smooth" });
+                              }}
+                            >
+                              <Mail className="w-4 h-4 mr-2" />
+                              Nous contacter
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Loading state while checking eligibility */}
+                  {trialEligibility.checking && (
+                    <div className="p-6 rounded-xl bg-muted/50 border border-border text-center">
+                      <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                      <p className="text-muted-foreground">Vérification de votre éligibilité...</p>
+                    </div>
+                  )}
                 </div>
               )}
 

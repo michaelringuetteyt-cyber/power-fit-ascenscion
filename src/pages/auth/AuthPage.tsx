@@ -1,5 +1,5 @@
 import { useState, useEffect, forwardRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,7 @@ const signupSchema = authSchema.extend({
 
 const AuthPage = forwardRef<HTMLDivElement>((_, ref) => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -57,6 +58,13 @@ const AuthPage = forwardRef<HTMLDivElement>((_, ref) => {
   }, [navigate]);
 
   const checkRoleAndRedirect = async (userId: string) => {
+    // Check for redirect parameter first
+    const redirectTo = searchParams.get("redirect");
+    if (redirectTo) {
+      navigate(redirectTo);
+      return;
+    }
+
     const { data: roles } = await supabase
       .from("user_roles")
       .select("role")

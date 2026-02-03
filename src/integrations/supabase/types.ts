@@ -408,6 +408,14 @@ export type Database = {
         Args: { admin_name: string; new_user_id: string }
         Returns: boolean
       }
+      create_trial_pass_if_eligible: {
+        Args: { p_user_id: string }
+        Returns: {
+          pass_id: string
+          reason: string
+          success: boolean
+        }[]
+      }
       deduct_session_from_pass:
         | {
             Args: { p_user_id: string }

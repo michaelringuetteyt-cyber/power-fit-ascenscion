@@ -67,6 +67,7 @@ const Header = () => {
   const navLinks = [
     { href: "#about", label: "Approche" },
     { href: "#services", label: "Services" },
+    { href: "#trainers", label: "Entraîneurs" },
     { href: "#gallery", label: "Galerie" },
     { href: "#contact", label: "Contact" },
   ];

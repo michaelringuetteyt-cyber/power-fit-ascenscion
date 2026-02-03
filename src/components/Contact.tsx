@@ -1,4 +1,4 @@
-import { MapPin, Phone, Mail, Clock, Instagram, Facebook } from "lucide-react";
+import { MapPin, Phone, Mail, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const Contact = () => {
@@ -69,25 +69,6 @@ const Contact = () => {
                   <p className="text-muted-foreground text-sm">{info.subcontent}</p>
                 </div>
               ))}
-            </div>
-
-            {/* Social Links */}
-            <div className="dashboard-card card-3d">
-              <h3 className="font-display text-xl mb-4 tracking-wide">Suivez-nous</h3>
-              <div className="flex gap-4">
-                <a
-                  href="#"
-                  className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center hover:bg-primary/20 hover:text-primary hover:neon-glow transition-all duration-300"
-                >
-                  <Instagram className="w-5 h-5" />
-                </a>
-                <a
-                  href="#"
-                  className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center hover:bg-primary/20 hover:text-primary hover:neon-glow transition-all duration-300"
-                >
-                  <Facebook className="w-5 h-5" />
-                </a>
-              </div>
             </div>
 
             {/* Quick Actions */}

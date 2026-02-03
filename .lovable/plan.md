@@ -1,197 +1,145 @@
 
-# Plan: Espace Client et Gestion des Admins
+# Plan: Confirmation automatique des achats Square et ajout des laissez-passer
 
 ## Objectif
-Ajouter un espace client où les utilisateurs peuvent s'inscrire/se connecter pour gérer leur compte, et permettre aux admins d'ajouter de nouveaux administrateurs.
+Quand un client achète une carte de cours via Square (5 cours, 10 cours, accès mensuel, engagement 12 mois), le système doit automatiquement :
+1. Confirmer l'achat et l'enregistrer dans la table `purchases`
+2. Créer un laissez-passer correspondant dans la table `passes` du client
 
 ---
 
-## Partie 1: Base de données
+## Approche technique
 
-### Nouvelles tables à créer
+### Le défi avec Square
+Les liens Square actuels (`https://square.link/...`) sont des liens de paiement externes. Pour recevoir une confirmation de paiement, nous devons :
+1. Utiliser les **webhooks Square** pour recevoir les notifications de paiement
+2. Créer une **Edge Function** pour traiter ces notifications
+3. Lier le paiement au bon client
 
-**1. Table `profiles` (profils clients)**
-- `id` (uuid, clé primaire)
-- `user_id` (uuid, référence auth.users)
-- `full_name` (texte)
-- `email` (texte)
-- `phone` (texte, optionnel)
-- `avatar_url` (texte, optionnel)
-- `created_at` (timestamp)
-- `updated_at` (timestamp)
+### Architecture proposée
 
-**2. Table `passes` (laissez-passer)**
-- `id` (uuid, clé primaire)
-- `user_id` (uuid, référence profiles)
-- `pass_type` (texte: "5_sessions", "10_sessions", "monthly")
-- `total_sessions` (entier)
-- `remaining_sessions` (entier)
-- `purchase_date` (date)
-- `expiry_date` (date, optionnel)
-- `status` (texte: "active", "expired", "used")
-- `created_at` (timestamp)
-
-**3. Table `purchases` (achats)**
-- `id` (uuid, clé primaire)
-- `user_id` (uuid, référence profiles)
-- `pass_id` (uuid, référence passes, optionnel)
-- `item_name` (texte)
-- `amount` (decimal)
-- `purchase_date` (timestamp)
-- `payment_status` (texte: "pending", "completed", "refunded")
-
-### Modifications existantes
-- Ajouter `user_id` à la table `bookings` pour lier les réservations aux clients connectés
-
-### Politiques RLS
-- Clients peuvent voir/modifier leur propre profil uniquement
-- Clients peuvent voir leurs propres laissez-passer et achats
-- Admins peuvent voir/gérer tous les profils, passes et achats
-- Admins existants peuvent ajouter de nouveaux admins
-
----
-
-## Partie 2: Pages et composants
-
-### Nouvelles pages
-
-**1. `/client` - Tableau de bord client**
-- Vue d'ensemble du compte
-- Nombre de laissez-passer restants (affichage prominent)
-- Prochaines réservations
-- Historique récent des achats
-
-**2. `/client/profile` - Profil client**
-- Formulaire de modification (nom, email, téléphone)
-- Upload de photo de profil
-- Changement de mot de passe
-
-**3. `/client/bookings` - Mes réservations**
-- Liste des réservations à venir
-- Historique des réservations passées
-- Statut de chaque réservation
-
-**4. `/client/passes` - Mes laissez-passer**
-- Affichage des laissez-passer actifs avec sessions restantes
-- Historique des passes utilisés/expirés
-
-**5. `/client/purchases` - Mes achats**
-- Historique complet des achats
-- Détails de chaque transaction
-
-**6. `/auth` - Page de connexion/inscription**
-- Formulaire de connexion
-- Formulaire d'inscription
-- Lien "Mot de passe oublié"
-- Redirection vers espace client après connexion
-
-### Nouveaux composants
-
-**1. `ClientLayout.tsx`**
-- Layout similaire à AdminLayout
-- Sidebar avec navigation client
-- En-tête avec nom et avatar du client
-- Affichage du solde de laissez-passer
-
-**2. `PassCard.tsx`**
-- Composant pour afficher un laissez-passer
-- Barre de progression des sessions restantes
-- Style visuel attrayant
-
-**3. `BookingHistoryCard.tsx`**
-- Carte pour afficher une réservation
-- Date, heure, type, statut
-
-### Modification page admin
-
-**Page `/admin/users` - Gestion des utilisateurs (nouvelle)**
-- Liste des admins existants
-- Bouton "Ajouter un admin"
-- Formulaire pour inviter un admin (email existant)
-- Liste des clients (consultation)
-
----
-
-## Partie 3: Flux utilisateur
-
-### Inscription client
 ```text
-1. Client clique sur "Mon espace" dans le header
-2. Redirigé vers /auth
-3. Remplit le formulaire d'inscription
-4. Confirmation email (optionnel selon config)
-5. Connexion automatique
-6. Création automatique du profil
-7. Redirection vers /client
-```
-
-### Réservation avec compte
-```text
-1. Client connecté va sur la section réservation
-2. Ses infos sont pré-remplies
-3. La réservation est liée à son compte
-4. Visible dans son historique
-5. Ses laissez-passer sont mis à jour automatiquement
-```
-
-### Ajout d'admin
-```text
-1. Admin va sur /admin/users
-2. Clique sur "Ajouter un admin"
-3. Entre l'email d'un utilisateur existant
-4. L'utilisateur est ajouté à la table admin_users
-5. Il peut maintenant accéder à /admin
+Client connecté → Clique sur lien Square → Paie sur Square
+                                              ↓
+Square envoie webhook → Edge Function "square-webhook"
+                              ↓
+                        Vérifie le paiement
+                              ↓
+                        Identifie le client (via email)
+                              ↓
+                        Crée l'achat (purchases)
+                              ↓
+                        Crée le laissez-passer (passes)
 ```
 
 ---
 
-## Partie 4: Modifications du header
+## Partie 1: Edge Function pour les webhooks Square
 
-Ajouter un bouton "Mon espace" / "Connexion" dans le header:
-- Si non connecté: "Connexion" qui mène à `/auth`
-- Si connecté comme client: "Mon espace" qui mène à `/client`
-- Si connecté comme admin: Ajouter aussi un lien vers "Admin"
+### Fichier: `supabase/functions/square-webhook/index.ts`
+
+Cette fonction recevra les notifications de Square quand un paiement est complété :
+
+- Vérifie la signature du webhook (sécurité)
+- Extrait les informations de paiement (montant, email client, produit acheté)
+- Recherche le client dans `profiles` par email
+- Crée un enregistrement dans `purchases`
+- Crée le laissez-passer correspondant dans `passes`
+
+### Mapping des produits Square → Laissez-passer
+
+| Produit Square | pass_type | total_sessions | expiry_date |
+|----------------|-----------|----------------|-------------|
+| Carte de 5 cours | 5_sessions | 5 | null (pas d'expiration) |
+| Carte de 10 cours | 10_sessions | 10 | null |
+| Accès mensuel | monthly | 999 (illimité) | +30 jours |
+| Engagement 12 mois | yearly | 999 (illimité) | +365 jours |
 
 ---
 
-## Détails techniques
+## Partie 2: Configuration Square requise
 
-### Sécurité
-- Utilisation de zod pour la validation des formulaires
-- RLS strictes sur toutes les tables avec données personnelles
-- Fonction `is_admin()` en SECURITY DEFINER pour vérifier les droits admin
-- Aucune donnée sensible dans localStorage
+Pour que cela fonctionne, il faudra :
 
-### Trigger automatique
-- Création automatique d'un profil lors de l'inscription via trigger Supabase
+1. **Créer un webhook dans Square Dashboard** :
+   - URL: `https://fhwnmfarcultpaaqptej.supabase.co/functions/v1/square-webhook`
+   - Événement: `payment.completed`
 
-### Structure des fichiers
-```text
-src/
-  pages/
-    auth/
-      AuthPage.tsx
-    client/
-      ClientDashboard.tsx
-      ClientProfile.tsx
-      ClientBookings.tsx
-      ClientPasses.tsx
-      ClientPurchases.tsx
-    admin/
-      AdminUsersPage.tsx (nouveau)
-  components/
-    client/
-      ClientLayout.tsx
-      PassCard.tsx
-      BookingHistoryCard.tsx
-```
+2. **Ajouter les secrets** :
+   - `SQUARE_WEBHOOK_SIGNATURE_KEY` : pour vérifier l'authenticité des webhooks
+   - `SQUARE_ACCESS_TOKEN` : (optionnel) pour vérifier les paiements via l'API
+
+---
+
+## Partie 3: Modification du flux utilisateur
+
+### Option A: Lien Square personnalisé (recommandé)
+Modifier les liens Square pour inclure l'email du client connecté dans les métadonnées :
+
+1. Quand un client connecté clique sur un lien d'achat
+2. On redirige vers Square avec son email en paramètre
+3. Square inclut cet email dans le webhook
+4. L'Edge Function peut ainsi identifier le client
+
+### Option B: Correspondance par email
+- Le client entre son email lors du paiement Square
+- L'Edge Function cherche ce même email dans `profiles`
+- Si trouvé, le pass est ajouté automatiquement
+
+---
+
+## Partie 4: Composant d'achat amélioré
+
+### Modifications de `Services.tsx`
+
+Pour les clients connectés :
+- Afficher un message "Vous êtes connecté - votre achat sera lié à votre compte"
+- Générer des liens Square personnalisés avec l'email du client
+
+Pour les visiteurs non connectés :
+- Afficher un message "Connectez-vous pour que votre achat soit automatiquement ajouté à votre compte"
+- Les achats sans compte seront traités manuellement par l'admin
+
+---
+
+## Partie 5: Gestion admin des passes (bonus)
+
+Ajouter une section dans l'admin pour :
+- Voir les achats en attente de liaison (client non trouvé)
+- Attribuer manuellement un pass à un client
+- Consulter l'historique des achats automatiques
+
+---
+
+## Fichiers à créer/modifier
+
+### Nouveaux fichiers
+1. `supabase/functions/square-webhook/index.ts` - Edge Function pour recevoir les webhooks
+
+### Fichiers modifiés
+1. `src/components/Services.tsx` - Liens personnalisés pour clients connectés
+2. `src/pages/admin/AdminUsersPage.tsx` - Section gestion des passes (optionnel)
+
+---
+
+## Prérequis
+
+Avant l'implémentation, vous devrez :
+
+1. **Configurer Square** :
+   - Accéder à votre tableau de bord Square Developer
+   - Créer une application si pas déjà fait
+   - Configurer le webhook vers l'URL de l'Edge Function
+   - Récupérer la clé de signature du webhook
+
+2. **Ajouter les secrets** :
+   - `SQUARE_WEBHOOK_SIGNATURE_KEY`
 
 ---
 
 ## Résumé des livrables
 
-1. **Base de données**: 3 nouvelles tables + modifications RLS
-2. **Pages client**: 5 nouvelles pages avec layout dédié
-3. **Page admin**: 1 nouvelle page pour gérer les utilisateurs/admins
-4. **Authentification**: Page /auth avec inscription et connexion
-5. **Header**: Bouton de connexion/accès espace client
+1. **Edge Function** : `square-webhook` pour recevoir et traiter les paiements
+2. **Mise à jour Services.tsx** : Liens personnalisés pour clients connectés
+3. **Configuration secrets** : Clé de signature Square
+4. **Documentation** : Instructions pour configurer le webhook Square

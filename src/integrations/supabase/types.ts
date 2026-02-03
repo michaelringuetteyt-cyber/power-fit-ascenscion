@@ -357,6 +357,17 @@ export type Database = {
         Args: { admin_name: string; new_user_id: string }
         Returns: boolean
       }
+      deduct_session_from_pass: {
+        Args: { p_user_id: string }
+        Returns: {
+          message: string
+          pass_id: string
+          pass_type: string
+          remaining_sessions: number
+          success: boolean
+        }[]
+      }
+      expire_outdated_passes: { Args: never; Returns: undefined }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

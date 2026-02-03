@@ -1,4 +1,4 @@
-import { Instagram, Facebook, Mail, Phone } from "lucide-react";
+import { Facebook, Mail, Phone } from "lucide-react";
 import logo from "@/assets/logo.png";
 
 const Footer = () => {
@@ -31,14 +31,6 @@ const Footer = () => {
               où chaque individu s'élève vers sa meilleure version.
             </p>
             <div className="flex gap-4">
-              <a
-                href="https://www.facebook.com/profile.php?id=61586281512766"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center hover:bg-primary/20 hover:text-primary transition-all duration-300"
-              >
-                <Instagram className="w-5 h-5" />
-              </a>
               <a
                 href="https://www.facebook.com/profile.php?id=61586281512766"
                 target="_blank"

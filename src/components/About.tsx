@@ -59,7 +59,7 @@ const About = () => {
         <div className="mt-20 grid grid-cols-2 md:grid-cols-4 gap-8">
           {[
             { number: "15+", label: "Membres transformés" },
-            { number: "15+", label: "Cours par semaine" },
+            { number: "8", label: "Cours par mois" },
             { number: "98%", label: "Satisfaction client" },
             { number: "3", label: "Piliers d'excellence" },
           ].map((stat, index) => (

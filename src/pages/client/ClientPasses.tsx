@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import ClientLayout from "@/components/client/ClientLayout";
+import TrialPassCard from "@/components/client/TrialPassCard";
 import { Ticket, Calendar, Clock } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -24,6 +25,7 @@ const ClientPasses = () => {
   const [activePasses, setActivePasses] = useState<Pass[]>([]);
   const [inactivePasses, setInactivePasses] = useState<Pass[]>([]);
   const [loading, setLoading] = useState(true);
+  const [clientName, setClientName] = useState("");
 
   useEffect(() => {
     loadPasses();
@@ -34,6 +36,17 @@ const ClientPasses = () => {
     if (!user) {
       navigate("/auth");
       return;
+    }
+
+    // Load profile for client name
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    
+    if (profile) {
+      setClientName(profile.full_name || "");
     }
 
     const [activeRes, inactiveRes] = await Promise.all([
@@ -194,23 +207,47 @@ const ClientPasses = () => {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="active" className="space-y-4">
+          <TabsContent value="active" className="space-y-6">
             {activePasses.length === 0 ? (
               <EmptyState message="Aucun laissez-passer actif" />
             ) : (
-              activePasses.map((pass) => (
-                <PassCard key={pass.id} pass={pass} isActive />
-              ))
+              <>
+                {/* Trial passes get special display */}
+                {activePasses.filter(p => p.pass_type === "trial").map((pass) => (
+                  <TrialPassCard 
+                    key={pass.id}
+                    clientName={clientName}
+                    status={pass.status}
+                    remainingSessions={pass.remaining_sessions}
+                  />
+                ))}
+                {/* Other passes */}
+                {activePasses.filter(p => p.pass_type !== "trial").map((pass) => (
+                  <PassCard key={pass.id} pass={pass} isActive />
+                ))}
+              </>
             )}
           </TabsContent>
 
-          <TabsContent value="history" className="space-y-4">
+          <TabsContent value="history" className="space-y-6">
             {inactivePasses.length === 0 ? (
               <EmptyState message="Aucun laissez-passer dans l'historique" />
             ) : (
-              inactivePasses.map((pass) => (
-                <PassCard key={pass.id} pass={pass} />
-              ))
+              <>
+                {/* Used trial passes */}
+                {inactivePasses.filter(p => p.pass_type === "trial").map((pass) => (
+                  <TrialPassCard 
+                    key={pass.id}
+                    clientName={clientName}
+                    status={pass.status}
+                    remainingSessions={pass.remaining_sessions}
+                  />
+                ))}
+                {/* Other passes */}
+                {inactivePasses.filter(p => p.pass_type !== "trial").map((pass) => (
+                  <PassCard key={pass.id} pass={pass} />
+                ))}
+              </>
             )}
           </TabsContent>
         </Tabs>

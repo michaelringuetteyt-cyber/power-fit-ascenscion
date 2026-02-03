@@ -1,145 +1,177 @@
 
-# Plan: Gestion manuelle des passes par l'admin avec déduction automatique
+
+# Plan: Laissez-passer automatique pour cours d'essai gratuit (1 par client)
 
 ## Objectif
-1. L'admin peut attribuer manuellement des laissez-passer aux clients depuis le panneau admin
-2. À chaque réservation confirmée, une séance est automatiquement déduite du laissez-passer actif du client
+Modifier le flux de reservation du "Cours d'essai gratuit" pour :
+1. Exiger que le client soit connecte (authentifie)
+2. Attribuer automatiquement un laissez-passer gratuit de type "essai" (1 seance)
+3. Limiter a un seul laissez-passer d'essai par client (pas de double attribution)
 
 ---
 
-## Partie 1: Panneau Admin - Attribution des passes
-
-### Modifications de `AdminUsersPage.tsx`
-
-Ajouter un nouvel onglet "Passes" dans la page admin des utilisateurs avec les fonctionnalités suivantes :
-
-**1. Liste des clients avec leurs passes**
-- Afficher chaque client avec son nombre de séances restantes
-- Bouton "Attribuer un pass" par client
-
-**2. Modal d'attribution de pass**
-- Sélection du type de pass :
-  - Carte de 5 cours (5 séances)
-  - Carte de 10 cours (10 séances)
-  - Accès mensuel (999 séances, expire dans 30 jours)
-  - Engagement 12 mois (999 séances, expire dans 365 jours)
-- Montant de l'achat (pour l'historique)
-- Création automatique dans les tables `purchases` et `passes`
-
-**3. Visualisation des passes existants**
-- Liste des passes actifs par client
-- Possibilité de modifier le nombre de séances restantes
-- Historique des achats
-
----
-
-## Partie 2: Déduction automatique à la réservation
-
-### Nouvelle fonction base de données
-
-Créer une fonction `deduct_session_on_booking()` qui sera appelée après chaque réservation confirmée :
+## Flux utilisateur propose
 
 ```text
-1. Vérifier si le booking a un user_id
-2. Trouver le pass actif le plus prioritaire :
-   - Passes avec expiration proche en premier
-   - Puis passes avec le moins de séances
-3. Déduire 1 séance
-4. Si remaining_sessions = 0 → status = 'used'
-5. Vérifier les expirations
-```
-
-### Trigger automatique (optionnel)
-
-Option A: Trigger à l'insertion d'un booking
-- Déduction automatique quand `status = 'confirmed'` et `user_id` est présent
-
-Option B: Appel manuel depuis le code
-- L'admin confirme une réservation → déduction
-- Plus de contrôle mais nécessite une action manuelle
-
-**Approche recommandée : Option B** - L'admin confirme les réservations depuis le panneau, ce qui déclenche la déduction.
-
----
-
-## Partie 3: Confirmation de réservation par l'admin
-
-### Modifications de `AdminBookingsPage.tsx`
-
-Ajouter un bouton "Confirmer" sur chaque réservation en attente :
-- Change le status de `pending` à `confirmed`
-- Appelle la fonction de déduction de séance
-- Affiche le nombre de séances restantes après déduction
-- Notification si le client n'a pas de pass actif
-
----
-
-## Partie 4: Flux utilisateur complet
-
-```text
-Client achète une carte chez Square
-        ↓
-Admin reçoit notification de paiement (hors système)
-        ↓
-Admin va sur /admin/users → Onglet "Passes"
-        ↓
-Sélectionne le client → "Attribuer un pass"
-        ↓
-Choisit le type (5 cours, 10 cours, mensuel, annuel)
-        ↓
-Pass créé + Achat enregistré
-        ↓
-Client réserve un cours d'essai/session
-        ↓
-Admin confirme la réservation depuis /admin/bookings
-        ↓
-1 séance déduite automatiquement du pass actif
-        ↓
-Client voit ses séances mises à jour dans son espace
+Client clique sur "Cours d'essai gratuit"
+        |
+        v
+Est-il connecte ?
+   |          |
+  NON        OUI
+   |          |
+   v          |
+Redirection vers   <----+
+page d'authentification
+   |
+   v
+Connexion / Inscription
+   |
+   v
+Retour a la reservation
+        |
+        v
+Verification: A-t-il deja un pass "trial" ?
+   |          |
+  OUI        NON
+   |          |
+   v          v
+Message:    Attribution automatique
+"Vous avez  d'un pass gratuit (1 seance)
+deja utilise       |
+votre essai"       v
+   |         Continue vers selection
+   v         date/heure puis confirmation
+Proposition de
+contacter ou acheter
+un pass
 ```
 
 ---
 
-## Fichiers à modifier
+## Partie 1: Modification de la base de donnees
 
-### 1. `src/pages/admin/AdminUsersPage.tsx`
-- Ajout d'un onglet "Gestion des passes"
-- Liste des clients avec solde de séances
-- Modal d'attribution de pass
-- Formulaire : type de pass, montant, confirmation
+### Nouveau type de pass
+Ajouter la gestion du type `trial` (essai gratuit) dans la table `passes` existante :
+- `pass_type`: "trial"
+- `total_sessions`: 1
+- `remaining_sessions`: 1
+- `status`: "active"
 
-### 2. `src/pages/admin/AdminBookingsPage.tsx`
-- Bouton "Confirmer" sur les réservations pending
-- Indicateur du nombre de séances restantes
-- Alerte si pas de pass actif
-
-### 3. Migration base de données
-- Fonction `deduct_session_from_pass(user_id uuid)` pour gérer la logique de déduction
-- Mise à jour RLS si nécessaire pour permettre les inserts admin
-
----
-
-## Structure de l'interface admin
+### Fonction SQL de verification et attribution
+Creer une fonction `create_trial_pass_if_eligible(p_user_id uuid)` qui :
+1. Verifie si l'utilisateur a deja un pass de type "trial" (peu importe son status)
+2. Si non, cree un nouveau pass trial gratuit
+3. Retourne le resultat (succes, deja_utilise, erreur)
 
 ```text
-/admin/users
-├── Onglet "Administrateurs" (existant)
-├── Onglet "Clients" (existant)
-└── Onglet "Passes" (nouveau)
-    ├── Tableau des clients
-    │   ├── Nom | Email | Séances restantes | Actions
-    │   └── [Attribuer un pass] [Voir historique]
-    └── Modal Attribution
-        ├── Type de pass (dropdown)
-        ├── Montant (input)
-        └── [Confirmer]
+Logique:
+1. SELECT COUNT(*) FROM passes WHERE user_id = p_user_id AND pass_type = 'trial'
+2. Si count > 0 -> retourne {success: false, reason: 'already_used'}
+3. Sinon -> INSERT INTO passes + retourne {success: true, pass_id: ...}
 ```
 
 ---
 
-## Résumé des livrables
+## Partie 2: Modifications du composant Booking
 
-1. **AdminUsersPage.tsx** : Nouvel onglet pour gérer les passes des clients
-2. **AdminBookingsPage.tsx** : Confirmation de réservation avec déduction automatique
-3. **Fonction SQL** : `deduct_session_from_pass()` pour la logique métier
-4. **Pas besoin d'intégration Square** : Gestion 100% manuelle par l'admin
+### Etape 1 - Selection du type (existant)
+- Quand le client selectionne "Cours d'essai gratuit" :
+  - Verifier s'il est connecte
+  - Si non connecte -> afficher message + bouton "Se connecter" qui redirige vers `/auth?redirect=/booking`
+  - Si connecte -> verifier l'eligibilite au pass trial
+
+### Etape 2 - Verification eligibilite (nouveau)
+Avant d'afficher le calendrier :
+1. Appeler la fonction `create_trial_pass_if_eligible`
+2. Si eligible : creer le pass automatiquement et afficher le calendrier
+3. Si non eligible : afficher un message explicatif avec alternatives
+
+### Message pour client non eligible
+```text
+"Vous avez deja beneficie de votre cours d'essai gratuit.
+
+Pour continuer votre entrainement, decouvrez nos offres :
+- Carte de 5 cours
+- Carte de 10 cours
+- Abonnement mensuel
+
+[Voir les offres] [Nous contacter]"
+```
+
+### Etape 3 - Confirmation de reservation
+- Lors de la soumission, la reservation est creee normalement
+- Le pass trial a deja ete attribue a l'etape 2
+- La deduction de seance se fait lors de la confirmation admin (systeme existant)
+
+---
+
+## Partie 3: Gestion du retour apres authentification
+
+### Modification de AuthPage
+- Accepter un parametre `redirect` dans l'URL
+- Apres connexion reussie, rediriger vers ce parametre si present
+- Sinon, comportement actuel (redirection selon role)
+
+### URL de redirection
+- `/auth?redirect=/booking#booking` pour revenir directement a la section reservation
+
+---
+
+## Fichiers a modifier
+
+| Fichier | Modifications |
+|---------|---------------|
+| `src/components/Booking.tsx` | Logique d'authentification obligatoire pour trial, verification eligibilite, affichage messages |
+| `src/pages/auth/AuthPage.tsx` | Support du parametre `redirect` dans l'URL |
+| Migration SQL | Fonction `create_trial_pass_if_eligible()` |
+
+---
+
+## Details techniques
+
+### Structure du pass trial
+```text
+{
+  user_id: [user_id],
+  pass_type: "trial",
+  total_sessions: 1,
+  remaining_sessions: 1,
+  status: "active",
+  purchase_date: CURRENT_DATE,
+  expiry_date: NULL (pas d'expiration pour l'essai)
+}
+```
+
+### Modification Booking.tsx - Points cles
+
+1. **Nouvel etat pour l'eligibilite trial**
+```text
+const [trialEligibility, setTrialEligibility] = useState<{
+  checked: boolean;
+  eligible: boolean;
+  passId?: string;
+}>({ checked: false, eligible: false });
+```
+
+2. **Fonction de verification**
+Appeler la fonction SQL lors de la selection du type "trial" pour un utilisateur connecte
+
+3. **Rendu conditionnel**
+- Si non connecte + trial -> afficher invite de connexion
+- Si connecte + non eligible -> afficher message "deja utilise"
+- Si connecte + eligible -> creer le pass et continuer vers calendrier
+
+### Modification AuthPage.tsx
+- Lire `searchParams.get('redirect')`
+- Apres `checkRoleAndRedirect`, si redirect existe, naviguer vers ce chemin plutot que vers `/admin` ou `/client`
+
+---
+
+## Resume des livrables
+
+1. **Migration SQL** : Fonction `create_trial_pass_if_eligible(p_user_id uuid)`
+2. **Booking.tsx** : Authentification obligatoire + verification eligibilite + messages contextualises
+3. **AuthPage.tsx** : Support du parametre `redirect` pour retour a la reservation
+4. **ClientPasses.tsx** : Mise a jour du label pour afficher "Cours d'essai" pour le type "trial"
+

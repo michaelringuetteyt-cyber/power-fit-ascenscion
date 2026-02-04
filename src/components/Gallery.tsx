@@ -38,7 +38,7 @@ const Gallery = () => {
       .select("*")
       .eq("section", "gallery")
       .eq("content_type", "image")
-      .order("created_at", { ascending: false });
+      .order("updated_at", { ascending: false });
 
     if (data) {
       const items: GalleryItem[] = data.map((item) => {

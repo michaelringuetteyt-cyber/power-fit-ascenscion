@@ -3,6 +3,7 @@ import AdminLayout from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Calendar, Plus, Trash2, Clock, Users, CheckCircle, AlertCircle, Edit2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import RecurringDatesDialog from "@/components/admin/RecurringDatesDialog";
 import { toast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -224,13 +225,19 @@ const AdminBookingsPage = () => {
             <p className="text-muted-foreground">Gérez les dates disponibles et les réservations</p>
           </div>
           
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="hero">
-                <Plus className="w-4 h-4 mr-2" />
-                Ajouter une date
-              </Button>
-            </DialogTrigger>
+          <div className="flex items-center gap-3">
+            <RecurringDatesDialog 
+              onDatesAdded={fetchData} 
+              defaultTimeSlots={DEFAULT_TIME_SLOTS} 
+            />
+            
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="hero">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Ajouter une date
+                </Button>
+              </DialogTrigger>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Ajouter une date disponible</DialogTitle>
@@ -288,6 +295,7 @@ const AdminBookingsPage = () => {
               </div>
             </DialogContent>
           </Dialog>
+          </div>
 
           {/* Edit Max Bookings Dialog */}
           <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>

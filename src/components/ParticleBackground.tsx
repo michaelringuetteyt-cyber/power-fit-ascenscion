@@ -8,15 +8,44 @@ interface Particle {
   vy: number;
   vz: number;
   size: number;
+  baseSize: number;
   opacity: number;
+  baseOpacity: number;
   color: string;
+  life: number;
+  maxLife: number;
+  turbulenceOffset: number;
+  turbulenceSpeed: number;
+  rotationSpeed: number;
+  rotation: number;
 }
+
+// Simplex noise approximation for organic movement
+const noise2D = (x: number, y: number, seed: number = 0): number => {
+  const n = Math.sin(x * 12.9898 + y * 78.233 + seed) * 43758.5453;
+  return (n - Math.floor(n)) * 2 - 1;
+};
+
+const turbulence = (x: number, y: number, time: number, octaves: number = 4): number => {
+  let value = 0;
+  let amplitude = 1;
+  let frequency = 0.005;
+  
+  for (let i = 0; i < octaves; i++) {
+    value += amplitude * noise2D(x * frequency, y * frequency + time * 0.0005, i);
+    amplitude *= 0.5;
+    frequency *= 2;
+  }
+  
+  return value;
+};
 
 const ParticleBackground = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const particlesRef = useRef<Particle[]>([]);
   const animationRef = useRef<number>();
   const mouseRef = useRef({ x: 0, y: 0 });
+  const timeRef = useRef(0);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -30,134 +59,186 @@ const ParticleBackground = () => {
       canvas.height = window.innerHeight;
     };
 
-    const createParticles = () => {
-      const particles: Particle[] = [];
-      const particleCount = Math.floor((window.innerWidth * window.innerHeight) / 15000);
-      
+    const createParticle = (x?: number, y?: number): Particle => {
       const colors = [
-        "hsla(0, 85%, 55%, 0.6)",    // Primary red
-        "hsla(210, 100%, 55%, 0.5)", // Secondary blue
-        "hsla(0, 85%, 65%, 0.4)",    // Light red
-        "hsla(210, 100%, 65%, 0.4)", // Light blue
-        "hsla(0, 0%, 100%, 0.3)",    // White
+        "hsla(0, 60%, 45%, ",      // Darker red smoke
+        "hsla(210, 80%, 45%, ",    // Blue smoke
+        "hsla(0, 50%, 35%, ",      // Deep red
+        "hsla(210, 60%, 35%, ",    // Deep blue
+        "hsla(220, 20%, 25%, ",    // Dark grey smoke
+        "hsla(0, 0%, 20%, ",       // Dark smoke
       ];
 
+      const maxLife = 300 + Math.random() * 400;
+      const baseSize = Math.random() * 60 + 30;
+      
+      return {
+        x: x ?? Math.random() * canvas.width,
+        y: y ?? canvas.height + Math.random() * 100,
+        z: Math.random() * 500,
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: -(Math.random() * 0.8 + 0.3), // Rising motion
+        vz: (Math.random() - 0.5) * 0.5,
+        size: baseSize * 0.3,
+        baseSize: baseSize,
+        opacity: 0,
+        baseOpacity: Math.random() * 0.15 + 0.05,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        life: 0,
+        maxLife: maxLife,
+        turbulenceOffset: Math.random() * 1000,
+        turbulenceSpeed: Math.random() * 0.5 + 0.5,
+        rotationSpeed: (Math.random() - 0.5) * 0.02,
+        rotation: Math.random() * Math.PI * 2,
+      };
+    };
+
+    const createParticles = () => {
+      const particles: Particle[] = [];
+      const particleCount = Math.floor((window.innerWidth * window.innerHeight) / 25000);
+      
       for (let i = 0; i < particleCount; i++) {
-        particles.push({
-          x: Math.random() * canvas.width,
-          y: Math.random() * canvas.height,
-          z: Math.random() * 1000,
-          vx: (Math.random() - 0.5) * 0.5,
-          vy: (Math.random() - 0.5) * 0.5,
-          vz: (Math.random() - 0.5) * 2,
-          size: Math.random() * 3 + 1,
-          opacity: Math.random() * 0.5 + 0.2,
-          color: colors[Math.floor(Math.random() * colors.length)],
-        });
+        const particle = createParticle();
+        particle.life = Math.random() * particle.maxLife; // Stagger initial states
+        particle.y = Math.random() * canvas.height;
+        particles.push(particle);
       }
       return particles;
     };
 
-    const drawParticle = (particle: Particle) => {
-      const perspective = 1000;
+    const drawSmokeParticle = (particle: Particle) => {
+      const perspective = 800;
       const scale = perspective / (perspective + particle.z);
       const x2d = (particle.x - canvas.width / 2) * scale + canvas.width / 2;
       const y2d = (particle.y - canvas.height / 2) * scale + canvas.height / 2;
-      const size2d = particle.size * scale;
-
-      // 3D glow effect
-      const gradient = ctx.createRadialGradient(x2d, y2d, 0, x2d, y2d, size2d * 3);
-      gradient.addColorStop(0, particle.color);
-      gradient.addColorStop(0.5, particle.color.replace(/[\d.]+\)$/, `${particle.opacity * 0.5})`));
-      gradient.addColorStop(1, "transparent");
-
-      ctx.beginPath();
-      ctx.arc(x2d, y2d, size2d * 3, 0, Math.PI * 2);
-      ctx.fillStyle = gradient;
-      ctx.fill();
-
-      // Core particle
-      ctx.beginPath();
-      ctx.arc(x2d, y2d, size2d, 0, Math.PI * 2);
-      ctx.fillStyle = particle.color;
-      ctx.fill();
-    };
-
-    const drawConnections = (particles: Particle[]) => {
-      for (let i = 0; i < particles.length; i++) {
-        for (let j = i + 1; j < particles.length; j++) {
-          const dx = particles[i].x - particles[j].x;
-          const dy = particles[i].y - particles[j].y;
-          const dz = particles[i].z - particles[j].z;
-          const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-
-          if (distance < 150) {
-            const perspective = 1000;
-            const scale1 = perspective / (perspective + particles[i].z);
-            const scale2 = perspective / (perspective + particles[j].z);
-            
-            const x1 = (particles[i].x - canvas.width / 2) * scale1 + canvas.width / 2;
-            const y1 = (particles[i].y - canvas.height / 2) * scale1 + canvas.height / 2;
-            const x2 = (particles[j].x - canvas.width / 2) * scale2 + canvas.width / 2;
-            const y2 = (particles[j].y - canvas.height / 2) * scale2 + canvas.height / 2;
-
-            const opacity = (1 - distance / 150) * 0.15;
-            ctx.beginPath();
-            ctx.moveTo(x1, y1);
-            ctx.lineTo(x2, y2);
-            ctx.strokeStyle = `hsla(0, 85%, 55%, ${opacity})`;
-            ctx.lineWidth = 0.5;
-            ctx.stroke();
-          }
-        }
+      
+      // Life-based calculations
+      const lifeRatio = particle.life / particle.maxLife;
+      
+      // Fade in at start, fade out at end
+      let fadeMultiplier = 1;
+      if (lifeRatio < 0.1) {
+        fadeMultiplier = lifeRatio / 0.1;
+      } else if (lifeRatio > 0.7) {
+        fadeMultiplier = 1 - ((lifeRatio - 0.7) / 0.3);
       }
+      
+      // Size grows as smoke rises
+      const sizeMultiplier = 0.3 + lifeRatio * 0.7;
+      const size2d = particle.baseSize * sizeMultiplier * scale;
+      
+      const currentOpacity = particle.baseOpacity * fadeMultiplier * scale;
+      
+      if (currentOpacity <= 0.001 || size2d < 1) return;
+
+      ctx.save();
+      ctx.translate(x2d, y2d);
+      ctx.rotate(particle.rotation);
+      
+      // Multi-layer smoke effect for realism
+      const layers = 3;
+      for (let layer = 0; layer < layers; layer++) {
+        const layerSize = size2d * (1 - layer * 0.2);
+        const layerOpacity = currentOpacity * (1 - layer * 0.3);
+        
+        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, layerSize);
+        gradient.addColorStop(0, `${particle.color}${layerOpacity * 0.8})`);
+        gradient.addColorStop(0.3, `${particle.color}${layerOpacity * 0.4})`);
+        gradient.addColorStop(0.6, `${particle.color}${layerOpacity * 0.15})`);
+        gradient.addColorStop(1, `${particle.color}0)`);
+        
+        ctx.beginPath();
+        ctx.arc(0, 0, layerSize, 0, Math.PI * 2);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+      }
+      
+      ctx.restore();
     };
 
-    const updateParticle = (particle: Particle) => {
-      // Mouse interaction
+    const updateParticle = (particle: Particle, deltaTime: number) => {
+      const time = timeRef.current;
+      
+      // Turbulence for organic movement
+      const turbX = turbulence(
+        particle.x + particle.turbulenceOffset, 
+        particle.y, 
+        time * particle.turbulenceSpeed
+      );
+      const turbY = turbulence(
+        particle.x, 
+        particle.y + particle.turbulenceOffset + 500, 
+        time * particle.turbulenceSpeed
+      );
+      
+      // Apply turbulence to velocity
+      particle.vx += turbX * 0.02;
+      particle.vy += turbY * 0.015;
+      
+      // Rising motion with slight deceleration
+      particle.vy -= 0.002;
+      
+      // Mouse repulsion
       const dx = mouseRef.current.x - particle.x;
       const dy = mouseRef.current.y - particle.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
       
-      if (distance < 200) {
+      if (distance < 200 && distance > 0) {
         const force = (200 - distance) / 200;
-        particle.vx -= (dx / distance) * force * 0.02;
-        particle.vy -= (dy / distance) * force * 0.02;
+        particle.vx -= (dx / distance) * force * 0.15;
+        particle.vy -= (dy / distance) * force * 0.15;
       }
-
-      // Update position
-      particle.x += particle.vx;
-      particle.y += particle.vy;
-      particle.z += particle.vz;
-
-      // Apply friction
-      particle.vx *= 0.99;
-      particle.vy *= 0.99;
-
-      // Boundaries with 3D wrap
-      if (particle.x < 0) particle.x = canvas.width;
-      if (particle.x > canvas.width) particle.x = 0;
-      if (particle.y < 0) particle.y = canvas.height;
-      if (particle.y > canvas.height) particle.y = 0;
-      if (particle.z < 0) particle.z = 1000;
-      if (particle.z > 1000) particle.z = 0;
-
-      // Pulsing opacity
-      particle.opacity = 0.2 + Math.sin(Date.now() * 0.001 + particle.x * 0.01) * 0.3;
+      
+      // Apply velocity with damping
+      particle.x += particle.vx * deltaTime;
+      particle.y += particle.vy * deltaTime;
+      particle.z += particle.vz * deltaTime;
+      
+      // Damping for natural deceleration
+      particle.vx *= 0.995;
+      particle.vy *= 0.998;
+      particle.vz *= 0.99;
+      
+      // Rotation
+      particle.rotation += particle.rotationSpeed;
+      
+      // Update life
+      particle.life += deltaTime * 0.5;
+      
+      // Z-axis boundaries
+      if (particle.z < 0) particle.z = 500;
+      if (particle.z > 500) particle.z = 0;
+      
+      // Reset particle when it dies or goes off screen
+      if (particle.life >= particle.maxLife || particle.y < -100) {
+        Object.assign(particle, createParticle(
+          Math.random() * canvas.width,
+          canvas.height + 50
+        ));
+      }
+      
+      // Wrap horizontal
+      if (particle.x < -100) particle.x = canvas.width + 100;
+      if (particle.x > canvas.width + 100) particle.x = -100;
     };
 
-    const animate = () => {
-      ctx.fillStyle = "rgba(10, 12, 16, 0.1)";
+    let lastTime = performance.now();
+    
+    const animate = (currentTime: number) => {
+      const deltaTime = Math.min((currentTime - lastTime) / 16.67, 3); // Normalize to ~60fps
+      lastTime = currentTime;
+      timeRef.current = currentTime;
+      
+      // Clear with slight fade for trails
+      ctx.fillStyle = "rgba(10, 12, 16, 0.08)";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      // Sort by z-index for proper 3D rendering
+      
+      // Sort by z-index for proper layering
       particlesRef.current.sort((a, b) => b.z - a.z);
-
-      drawConnections(particlesRef.current);
-
+      
       particlesRef.current.forEach((particle) => {
-        updateParticle(particle);
-        drawParticle(particle);
+        updateParticle(particle, deltaTime);
+        drawSmokeParticle(particle);
       });
 
       animationRef.current = requestAnimationFrame(animate);
@@ -169,7 +250,7 @@ const ParticleBackground = () => {
 
     resizeCanvas();
     particlesRef.current = createParticles();
-    animate();
+    animationRef.current = requestAnimationFrame(animate);
 
     window.addEventListener("resize", () => {
       resizeCanvas();

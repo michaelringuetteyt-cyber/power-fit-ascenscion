@@ -357,7 +357,7 @@ const AdminBookingsPage = () => {
                           <div className="flex items-center gap-1">
                             <Clock className="w-3 h-3 text-muted-foreground" />
                             <span className="text-xs text-muted-foreground">
-                              {date.time_slots.length} créneaux
+                              {date.time_slots.length}
                             </span>
                           </div>
                           <div className="flex items-center gap-1">

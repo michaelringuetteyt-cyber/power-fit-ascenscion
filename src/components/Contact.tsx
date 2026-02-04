@@ -36,7 +36,7 @@ const Contact = () => {
   ];
 
   return (
-    <section id="contact" className="py-24 relative perspective-container">
+    <section id="contact" className="py-24 relative perspective-container bg-background/95">
       <div className="container mx-auto px-6">
         {/* Section Header */}
         <div className="text-center mb-16">

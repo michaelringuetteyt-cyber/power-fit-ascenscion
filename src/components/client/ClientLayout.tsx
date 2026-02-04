@@ -12,6 +12,7 @@ import {
   Menu,
   X,
   ChevronLeft,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -36,11 +37,26 @@ const ClientLayout = forwardRef<HTMLDivElement, ClientLayoutProps>(({ children }
   const [profile, setProfile] = useState<Profile | null>(null);
   const [remainingSessions, setRemainingSessions] = useState(0);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     loadProfile();
     loadPasses();
+    checkAdminStatus();
   }, []);
+
+  const checkAdminStatus = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data } = await supabase
+      .from("admin_users")
+      .select("id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    setIsAdmin(!!data);
+  };
 
   const loadProfile = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -147,7 +163,21 @@ const ClientLayout = forwardRef<HTMLDivElement, ClientLayoutProps>(({ children }
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 p-4 space-y-1">
+          <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+            {/* Admin section - only if admin */}
+            {isAdmin && (
+              <div className="mb-4">
+                <Link
+                  to="/admin"
+                  onClick={() => setIsSidebarOpen(false)}
+                  className="flex items-center gap-3 px-4 py-3 rounded-lg transition-colors bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20"
+                >
+                  <Settings className="w-5 h-5" />
+                  <span className="font-medium">Administration</span>
+                </Link>
+              </div>
+            )}
+
             {navItems.map((item) => (
               <Link
                 key={item.href}

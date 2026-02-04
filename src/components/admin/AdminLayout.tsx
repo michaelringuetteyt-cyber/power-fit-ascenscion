@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
@@ -12,9 +12,26 @@ import {
   X,
   ArrowLeft,
   CalendarDays,
-  Users
+  Users,
+  User as UserIcon,
+  Ticket,
+  Receipt,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { User } from "@supabase/supabase-js";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+
+interface Profile {
+  full_name: string;
+  email: string;
+  avatar_url: string | null;
+}
+
+interface Pass {
+  remaining_sessions: number;
+  status: string;
+}
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -28,6 +45,9 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [remainingSessions, setRemainingSessions] = useState(0);
+  const [clientSectionOpen, setClientSectionOpen] = useState(false);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -49,6 +69,8 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
       if (adminData) {
         setIsAdmin(true);
         loadUnreadCount();
+        loadProfile(session.user.id);
+        loadPasses(session.user.id);
       }
       setLoading(false);
     };
@@ -64,6 +86,31 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const loadProfile = async (userId: string) => {
+    const { data } = await supabase
+      .from("profiles")
+      .select("full_name, email, avatar_url")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (data) {
+      setProfile(data);
+    }
+  };
+
+  const loadPasses = async (userId: string) => {
+    const { data } = await supabase
+      .from("passes")
+      .select("remaining_sessions, status")
+      .eq("user_id", userId)
+      .eq("status", "active");
+
+    if (data) {
+      const total = data.reduce((sum: number, pass: Pass) => sum + pass.remaining_sessions, 0);
+      setRemainingSessions(total);
+    }
+  };
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -186,12 +233,19 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
     }
   };
 
-  const navItems = [
+  const adminNavItems = [
     { path: "/admin", icon: LayoutDashboard, label: "Dashboard" },
     { path: "/admin/chat", icon: MessageCircle, label: "Messages", badge: unreadCount },
     { path: "/admin/bookings", icon: CalendarDays, label: "Réservations" },
     { path: "/admin/content", icon: Image, label: "Contenu" },
     { path: "/admin/users", icon: Users, label: "Utilisateurs" },
+  ];
+
+  const clientNavItems = [
+    { path: "/client/profile", icon: UserIcon, label: "Mon profil" },
+    { path: "/client/bookings", icon: CalendarDays, label: "Mes réservations" },
+    { path: "/client/passes", icon: Ticket, label: "Mes laissez-passer" },
+    { path: "/client/purchases", icon: Receipt, label: "Mes achats" },
   ];
 
   if (loading) {
@@ -310,55 +364,113 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         {/* Sidebar */}
         <aside className={`
           fixed lg:static inset-y-0 left-0 z-50
-          w-64 bg-card border-r border-border
+          w-72 bg-card border-r border-border h-screen overflow-y-auto
           transform transition-transform duration-300
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
         `}>
-          <div className="p-6 border-b border-border hidden lg:block">
-            <h1 className="font-display text-2xl">
-              POWER FIT <span className="text-primary">|</span> Admin
-            </h1>
-          </div>
-
-          <nav className="p-4 space-y-2">
-            {navItems.map((item) => (
-              <button
-                key={item.path}
-                onClick={() => {
-                  navigate(item.path);
-                  setSidebarOpen(false);
-                }}
-                className={`
-                  w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors
-                  ${location.pathname === item.path 
-                    ? "bg-primary text-primary-foreground" 
-                    : "hover:bg-muted text-muted-foreground hover:text-foreground"
-                  }
-                `}
-              >
-                <item.icon className="w-5 h-5" />
-                <span className="font-medium">{item.label}</span>
-                {item.badge && item.badge > 0 && (
-                  <span className="ml-auto w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center">
-                    {item.badge}
+          {/* Header with profile */}
+          <div className="p-6 border-b border-border">
+            <Link to="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4">
+              <ArrowLeft className="w-4 h-4" />
+              <span className="text-sm">Retour au site</span>
+            </Link>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
+                {profile?.avatar_url ? (
+                  <img
+                    src={profile.avatar_url}
+                    alt="Avatar"
+                    className="w-full h-full rounded-full object-cover"
+                  />
+                ) : (
+                  <span className="text-primary font-medium text-lg">
+                    {profile?.full_name?.charAt(0)?.toUpperCase() || user.email?.charAt(0).toUpperCase()}
                   </span>
                 )}
-              </button>
-            ))}
-          </nav>
-
-          <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-border hidden lg:block">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                <span className="text-primary font-medium">
-                  {user.email?.charAt(0).toUpperCase()}
-                </span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{user.email}</p>
-                <p className="text-xs text-muted-foreground">Administrateur</p>
+                <p className="font-medium truncate">
+                  {profile?.full_name || user.email?.split("@")[0]}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {profile?.email || user.email}
+                </p>
               </div>
             </div>
+          </div>
+
+          {/* Sessions counter */}
+          <div className="p-4 mx-4 mt-4 rounded-lg bg-primary/10 border border-primary/20">
+            <p className="text-xs text-muted-foreground mb-1">Séances restantes</p>
+            <p className="text-3xl font-display text-gradient">{remainingSessions}</p>
+          </div>
+
+          {/* Admin Navigation */}
+          <div className="p-4">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 px-4">Administration</p>
+            <nav className="space-y-1">
+              {adminNavItems.map((item) => (
+                <button
+                  key={item.path}
+                  onClick={() => {
+                    navigate(item.path);
+                    setSidebarOpen(false);
+                  }}
+                  className={`
+                    w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors
+                    ${location.pathname === item.path 
+                      ? "bg-primary text-primary-foreground" 
+                      : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                    }
+                  `}
+                >
+                  <item.icon className="w-5 h-5" />
+                  <span className="font-medium">{item.label}</span>
+                  {item.badge && item.badge > 0 && (
+                    <span className="ml-auto w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center">
+                      {item.badge}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </nav>
+          </div>
+
+          {/* Client Navigation */}
+          <div className="p-4 pt-0">
+            <Collapsible open={clientSectionOpen} onOpenChange={setClientSectionOpen}>
+              <CollapsibleTrigger className="w-full flex items-center justify-between text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 px-4 hover:text-foreground transition-colors">
+                <span>Mon espace client</span>
+                {clientSectionOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <nav className="space-y-1">
+                  {clientNavItems.map((item) => (
+                    <button
+                      key={item.path}
+                      onClick={() => {
+                        navigate(item.path);
+                        setSidebarOpen(false);
+                      }}
+                      className={`
+                        w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors
+                        ${location.pathname === item.path 
+                          ? "bg-primary/10 text-primary" 
+                          : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                        }
+                      `}
+                    >
+                      <item.icon className="w-5 h-5" />
+                      <span className="font-medium">{item.label}</span>
+                    </button>
+                  ))}
+                </nav>
+              </CollapsibleContent>
+            </Collapsible>
+          </div>
+
+          {/* Logout */}
+          <div className="p-4 border-t border-border mt-auto">
             <Button variant="outline" className="w-full" onClick={handleLogout}>
               <LogOut className="w-4 h-4 mr-2" />
               Déconnexion

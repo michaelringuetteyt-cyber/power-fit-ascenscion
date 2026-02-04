@@ -355,12 +355,6 @@ const AdminBookingsPage = () => {
                         <p className="font-medium capitalize">{formatDate(date.date)}</p>
                         <div className="flex items-center gap-3 mt-1">
                           <div className="flex items-center gap-1">
-                            <Clock className="w-3 h-3 text-muted-foreground" />
-                            <span className="text-xs text-muted-foreground">
-                              {date.time_slots.length}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1">
                             <Users className="w-3 h-3 text-muted-foreground" />
                             <span className="text-xs text-muted-foreground">
                               max {date.max_bookings} résa/créneau

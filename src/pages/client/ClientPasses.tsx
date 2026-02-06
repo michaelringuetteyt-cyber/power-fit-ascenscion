@@ -1,4 +1,4 @@
-import { useState, useEffect, forwardRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import ClientLayout from "@/components/client/ClientLayout";
@@ -20,7 +20,7 @@ interface Pass {
   created_at: string;
 }
 
-const ClientPasses = forwardRef<HTMLDivElement>((_, ref) => {
+const ClientPasses = () => {
   const navigate = useNavigate();
   const [activePasses, setActivePasses] = useState<Pass[]>([]);
   const [inactivePasses, setInactivePasses] = useState<Pass[]>([]);
@@ -174,7 +174,7 @@ const ClientPasses = forwardRef<HTMLDivElement>((_, ref) => {
 
   return (
     <ClientLayout>
-      <div ref={ref} className="p-6 lg:p-8">
+      <div className="p-6 lg:p-8">
         <div className="mb-8">
           <h1 className="font-display text-3xl lg:text-4xl mb-2">
             Mes laissez-passer
@@ -254,8 +254,6 @@ const ClientPasses = forwardRef<HTMLDivElement>((_, ref) => {
       </div>
     </ClientLayout>
   );
-});
-
-ClientPasses.displayName = "ClientPasses";
+};
 
 export default ClientPasses;

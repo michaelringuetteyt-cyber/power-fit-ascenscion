@@ -1,4 +1,4 @@
-import { useState, useEffect, forwardRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import ClientLayout from "@/components/client/ClientLayout";
@@ -15,7 +15,7 @@ interface Purchase {
   pass_id: string | null;
 }
 
-const ClientPurchases = forwardRef<HTMLDivElement>((_, ref) => {
+const ClientPurchases = () => {
   const navigate = useNavigate();
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,7 +71,7 @@ const ClientPurchases = forwardRef<HTMLDivElement>((_, ref) => {
 
   return (
     <ClientLayout>
-      <div ref={ref} className="p-6 lg:p-8">
+      <div className="p-6 lg:p-8">
         <div className="mb-8">
           <h1 className="font-display text-3xl lg:text-4xl mb-2">Mes achats</h1>
           <p className="text-muted-foreground">
@@ -140,8 +140,6 @@ const ClientPurchases = forwardRef<HTMLDivElement>((_, ref) => {
       </div>
     </ClientLayout>
   );
-});
-
-ClientPurchases.displayName = "ClientPurchases";
+};
 
 export default ClientPurchases;

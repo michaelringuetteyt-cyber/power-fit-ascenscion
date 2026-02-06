@@ -24,6 +24,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Users, UserPlus, Shield, User, Mail, Trash2, Ticket, FileText, Search, UserCog, Edit } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -113,13 +120,23 @@ const AdminUsersPage = () => {
   // Employee state
   const [employeeDialogOpen, setEmployeeDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
-  const [employeeEmail, setEmployeeEmail] = useState("");
+  const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [employeeName, setEmployeeName] = useState("");
   const [employeePermissions, setEmployeePermissions] = useState<EmployeePermissions>(defaultPermissions);
   const [employeeError, setEmployeeError] = useState("");
   const [savingEmployee, setSavingEmployee] = useState(false);
   const [deleteEmployeeDialogOpen, setDeleteEmployeeDialogOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
+
+  // Available clients for employee selection (clients not yet admin or employee)
+  const [allProfiles, setAllProfiles] = useState<Profile[]>([]);
+  
+  const availableClientsForEmployee = useMemo(() => {
+    const adminUserIds = admins.map(a => a.user_id);
+    const employeeUserIds = employees.map(e => e.user_id);
+    const excludedIds = [...adminUserIds, ...employeeUserIds];
+    return allProfiles.filter(p => !excludedIds.includes(p.user_id));
+  }, [allProfiles, admins, employees]);
 
   // Filtered and sorted clients
   const filteredClients = useMemo(() => {
@@ -164,6 +181,9 @@ const AdminUsersPage = () => {
     }
 
     if (profilesRes.data) {
+      // Store all profiles for employee selection
+      setAllProfiles(profilesRes.data);
+      
       // Filter out admins and employees from clients list
       const adminUserIds = adminsRes.data?.map(a => a.user_id) || [];
       const employeeUserIds = employeesRes.data?.map(e => e.user_id) || [];
@@ -360,7 +380,7 @@ const AdminUsersPage = () => {
   const openEmployeeDialog = (employee?: Employee) => {
     if (employee) {
       setEditingEmployee(employee);
-      setEmployeeEmail(employee.email || "");
+      setSelectedClientId(employee.user_id);
       setEmployeeName(employee.name);
       setEmployeePermissions({
         dashboard: employee.can_view_dashboard,
@@ -372,7 +392,7 @@ const AdminUsersPage = () => {
       });
     } else {
       setEditingEmployee(null);
-      setEmployeeEmail("");
+      setSelectedClientId("");
       setEmployeeName("");
       setEmployeePermissions(defaultPermissions);
     }
@@ -385,10 +405,9 @@ const AdminUsersPage = () => {
     setEmployeeError("");
 
     if (!editingEmployee) {
-      // Adding new employee
-      const emailResult = emailSchema.safeParse(employeeEmail);
-      if (!emailResult.success) {
-        setEmployeeError("Email invalide");
+      // Adding new employee - check client selection
+      if (!selectedClientId) {
+        setEmployeeError("Veuillez sélectionner un client");
         return;
       }
     }
@@ -426,23 +445,10 @@ const AdminUsersPage = () => {
           description: `Les permissions de ${employeeName} ont été mises à jour`,
         });
       } else {
-        // Find user by email
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("user_id")
-          .eq("email", employeeEmail.toLowerCase())
-          .maybeSingle();
-
-        if (!profile) {
-          setEmployeeError("Aucun utilisateur trouvé avec cet email. L'utilisateur doit d'abord s'inscrire.");
-          setSavingEmployee(false);
-          return;
-        }
-
-        // Check if already admin or employee
+        // Check if already admin or employee (double check)
         const [adminCheck, employeeCheck] = await Promise.all([
-          supabase.from("admin_users").select("id").eq("user_id", profile.user_id).maybeSingle(),
-          supabase.from("employee_permissions").select("id").eq("user_id", profile.user_id).maybeSingle(),
+          supabase.from("admin_users").select("id").eq("user_id", selectedClientId).maybeSingle(),
+          supabase.from("employee_permissions").select("id").eq("user_id", selectedClientId).maybeSingle(),
         ]);
 
         if (adminCheck.data) {
@@ -461,7 +467,7 @@ const AdminUsersPage = () => {
         const { error: insertError } = await supabase
           .from("employee_permissions")
           .insert({
-            user_id: profile.user_id,
+            user_id: selectedClientId,
             name: employeeName.trim(),
             can_view_dashboard: employeePermissions.dashboard,
             can_view_stats: employeePermissions.stats,
@@ -477,7 +483,7 @@ const AdminUsersPage = () => {
         // Add employee role
         await supabase
           .from("user_roles")
-          .insert({ user_id: profile.user_id, role: "employee" });
+          .insert({ user_id: selectedClientId, role: "employee" });
 
         toast({
           title: "Employé ajouté",
@@ -918,17 +924,36 @@ const AdminUsersPage = () => {
             <form onSubmit={handleSaveEmployee} className="space-y-4 mt-4">
               {!editingEmployee && (
                 <div className="space-y-2">
-                  <Label htmlFor="employeeEmail">Email de l'utilisateur</Label>
-                  <Input
-                    id="employeeEmail"
-                    type="email"
-                    value={employeeEmail}
-                    onChange={(e) => {
-                      setEmployeeEmail(e.target.value);
+                  <Label htmlFor="clientSelect">Sélectionner un client</Label>
+                  <Select
+                    value={selectedClientId}
+                    onValueChange={(value) => {
+                      setSelectedClientId(value);
+                      // Auto-fill the name
+                      const selectedClient = availableClientsForEmployee.find(c => c.user_id === value);
+                      if (selectedClient) {
+                        setEmployeeName(selectedClient.full_name || "");
+                      }
                       setEmployeeError("");
                     }}
-                    placeholder="utilisateur@email.com"
-                  />
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choisir un client..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableClientsForEmployee.length === 0 ? (
+                        <div className="p-2 text-sm text-muted-foreground text-center">
+                          Aucun client disponible
+                        </div>
+                      ) : (
+                        availableClientsForEmployee.map((client) => (
+                          <SelectItem key={client.user_id} value={client.user_id}>
+                            {client.full_name || "Sans nom"} ({client.email})
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
               <div className="space-y-2">

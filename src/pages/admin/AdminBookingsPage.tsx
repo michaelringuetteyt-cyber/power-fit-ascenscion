@@ -268,6 +268,23 @@ const AdminBookingsPage = () => {
     return types[type] || type;
   };
 
+  // Calculate bookings count per date
+  const getBookingsCountForDate = (date: string) => {
+    return bookings.filter(b => b.date === date).length;
+  };
+
+  // Calculate max capacity for a date (max_bookings * number of time slots)
+  const getMaxCapacityForDate = (date: AvailableDate) => {
+    return date.max_bookings * date.time_slots.length;
+  };
+
+  // Check if date is fully booked
+  const isDateFull = (date: AvailableDate) => {
+    const currentBookings = getBookingsCountForDate(date.date);
+    const maxCapacity = getMaxCapacityForDate(date);
+    return currentBookings >= maxCapacity;
+  };
+
   return (
     <AdminLayout>
       <div className="space-y-8">
@@ -398,42 +415,80 @@ const AdminBookingsPage = () => {
                 </p>
               ) : (
                 <div className="space-y-3 max-h-[500px] overflow-y-auto">
-                  {availableDates.map((date) => (
-                    <div
-                      key={date.id}
-                      className="flex items-center justify-between p-4 bg-muted/50 rounded-lg"
-                    >
-                      <div>
-                        <p className="font-medium capitalize">{formatDate(date.date)}</p>
-                        <div className="flex items-center gap-3 mt-1">
-                          <div className="flex items-center gap-1">
-                            <Users className="w-3 h-3 text-muted-foreground" />
-                            <span className="text-xs text-muted-foreground">
-                              max {date.max_bookings} résa/créneau
-                            </span>
+                  {availableDates.map((date) => {
+                    const currentBookings = getBookingsCountForDate(date.date);
+                    const maxCapacity = getMaxCapacityForDate(date);
+                    const isFull = isDateFull(date);
+                    const fillPercentage = Math.min((currentBookings / maxCapacity) * 100, 100);
+                    
+                    return (
+                      <div
+                        key={date.id}
+                        className={`flex items-center justify-between p-4 rounded-lg border ${
+                          isFull 
+                            ? "bg-destructive/10 border-destructive/30" 
+                            : "bg-muted/50 border-transparent"
+                        }`}
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium capitalize">{formatDate(date.date)}</p>
+                            {isFull && (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-destructive/20 text-destructive font-medium">
+                                COMPLET
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-4 mt-2">
+                            <div className="flex items-center gap-1">
+                              <Users className="w-3 h-3 text-muted-foreground" />
+                              <span className={`text-sm font-medium ${isFull ? "text-destructive" : "text-foreground"}`}>
+                                {currentBookings} / {maxCapacity}
+                              </span>
+                              <span className="text-xs text-muted-foreground">réservations</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-muted-foreground" />
+                              <span className="text-xs text-muted-foreground">
+                                {date.time_slots.length} créneaux × {date.max_bookings} max
+                              </span>
+                            </div>
+                          </div>
+                          {/* Progress bar */}
+                          <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full transition-all ${
+                                isFull 
+                                  ? "bg-destructive" 
+                                  : fillPercentage > 75 
+                                    ? "bg-yellow-500" 
+                                    : "bg-primary"
+                              }`}
+                              style={{ width: `${fillPercentage}%` }}
+                            />
                           </div>
                         </div>
+                        <div className="flex items-center gap-2 ml-4">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEditMaxBookings(date)}
+                            className="text-primary hover:text-primary hover:bg-primary/10"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteDate(date.id)}
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEditMaxBookings(date)}
-                          className="text-primary hover:text-primary hover:bg-primary/10"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteDate(date.id)}
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

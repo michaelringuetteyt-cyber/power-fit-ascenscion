@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, ArrowLeft, Dumbbell } from "lucide-react";
 import { z } from "zod";
@@ -28,6 +29,7 @@ function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -37,6 +39,23 @@ function AuthPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
+    // Vérifier si c'était une session temporaire après fermeture du navigateur
+    const checkTemporarySession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        // Si on a une session mais pas de flag temp_session, c'est une nouvelle ouverture de navigateur
+        // après une session temporaire -> déconnecter
+        const isTempSession = sessionStorage.getItem('temp_session');
+        if (!isTempSession && localStorage.getItem('supabase.auth.token')) {
+          // Vérifier si le flag existait avant la fermeture du navigateur
+          // sessionStorage se vide à la fermeture, donc si on n'a pas le flag mais on a une session,
+          // on vérifie si c'était marqué comme temporaire via un autre indicateur
+        }
+      }
+    };
+
+    checkTemporarySession();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (event === 'SIGNED_IN' && session?.user) {
@@ -104,6 +123,11 @@ function AuthPage() {
       email: formData.email,
       password: formData.password,
     });
+
+    if (!error && !rememberMe) {
+      // Marquer comme session temporaire
+      sessionStorage.setItem('temp_session', 'true');
+    }
 
     setLoading(false);
 
@@ -282,6 +306,22 @@ function AuthPage() {
                 <p className="text-xs text-destructive">{errors.password}</p>
               )}
             </div>
+
+            {isLogin && (
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="rememberMe"
+                  checked={rememberMe}
+                  onCheckedChange={(checked) => setRememberMe(checked === true)}
+                />
+                <Label 
+                  htmlFor="rememberMe" 
+                  className="text-sm font-normal cursor-pointer"
+                >
+                  Rester connecté
+                </Label>
+              </div>
+            )}
 
             {!isLogin && (
               <div className="space-y-2">

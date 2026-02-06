@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
-import { Calendar, Plus, Trash2, Clock, Users, CheckCircle, AlertCircle, Edit2 } from "lucide-react";
+import { Calendar, Plus, Trash2, Clock, Users, CheckCircle, AlertCircle, Edit2, XCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import RecurringDatesDialog from "@/components/admin/RecurringDatesDialog";
 import { toast } from "@/hooks/use-toast";
@@ -194,6 +194,58 @@ const AdminBookingsPage = () => {
         description: "Client sans compte - aucune déduction de pass" 
       });
     }
+
+    fetchData();
+  };
+
+  const handleCancelBooking = async (booking: Booking) => {
+    // If it was confirmed and user has account, refund the session first
+    if (booking.status === "confirmed" && booking.user_id) {
+      const { data, error: refundError } = await supabase
+        .rpc("refund_session_to_pass", { p_booking_id: booking.id });
+
+      if (refundError) {
+        console.error("Refund error:", refundError);
+        toast({ 
+          title: "Erreur", 
+          description: "Impossible de rembourser la séance", 
+          variant: "destructive" 
+        });
+        return;
+      }
+
+      if (data && data.length > 0) {
+        const result = data[0] as DeductionResult;
+        if (result.success) {
+          toast({ 
+            title: "Séance remboursée", 
+            description: `${result.message}. Séances restantes: ${result.remaining_sessions! > 900 ? "illimité" : result.remaining_sessions}` 
+          });
+        }
+      }
+    }
+
+    // Delete the booking
+    const { error: deleteError } = await supabase
+      .from("bookings")
+      .delete()
+      .eq("id", booking.id);
+
+    if (deleteError) {
+      toast({ 
+        title: "Erreur", 
+        description: "Impossible de supprimer la réservation", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    toast({ 
+      title: "Réservation annulée", 
+      description: booking.status === "confirmed" && booking.user_id 
+        ? "La séance a été remboursée au client" 
+        : "Réservation supprimée"
+    });
 
     fetchData();
   };

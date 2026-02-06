@@ -582,212 +582,180 @@ const Booking = () => {
               {/* Step Content */}
               {step === 1 && (
                 <div className="space-y-6">
-                  <h3 className="font-display text-2xl text-center mb-8">Choisissez votre type de rendez-vous</h3>
-                  <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {appointmentTypes.map((type) => {
-                      const isSessionType = type.id === "session";
-                      const nonTrialPasses = activePasses.filter(p => p.pass_type !== "trial");
-                      const hasValidPass = isSessionType && isLoggedIn && nonTrialPasses.length > 0;
-                      const isDisabled = isSessionType && isLoggedIn && nonTrialPasses.length === 0;
-                      
-                      return (
-                        <button
-                          key={type.id}
-                          onClick={() => handleTypeSelect(type)}
-                          disabled={trialEligibility.checking || isDisabled}
-                          className={`p-6 rounded-xl border transition-all duration-300 text-left hover:border-primary/50 ${
-                            formData.type === type.id 
-                              ? "border-primary bg-primary/10" 
-                              : "border-border bg-card"
-                          } ${trialEligibility.checking || isDisabled ? "opacity-50 cursor-not-allowed" : ""}`}
+                  {/* Login required screen - shown if user is not logged in */}
+                  {!isLoggedIn ? (
+                    <div className="text-center py-8">
+                      <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6">
+                        <LogIn className="w-10 h-10 text-primary" />
+                      </div>
+                      <h3 className="font-display text-2xl mb-4">Connexion requise</h3>
+                      <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                        Pour réserver une séance, vous devez être connecté à votre compte client.
+                        Cela nous permet de gérer vos réservations et vos laissez-passer.
+                      </p>
+                      <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                        <Button 
+                          variant="hero"
+                          size="lg"
+                          onClick={() => navigate("/auth?redirect=/#booking")}
                         >
-                          <span className="text-3xl mb-4 block">{type.icon}</span>
-                          <span className="font-medium">{type.label}</span>
-                          {!type.showCalendar && (
-                            <span className="block text-xs text-muted-foreground mt-2">Remplir le formulaire →</span>
-                          )}
-                          {isSessionType && hasValidPass && (
-                            <span className="block text-xs text-primary mt-2">
-                              {nonTrialPasses.reduce((sum, p) => sum + p.remaining_sessions, 0)} séance(s) disponible(s)
-                            </span>
-                          )}
-                          {isSessionType && isLoggedIn && nonTrialPasses.length === 0 && (
-                            <span className="block text-xs text-muted-foreground mt-2">Aucun pass actif</span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Trial login prompt - shown when trial is selected but user not logged in */}
-                  {formData.type === "trial" && !isLoggedIn && (
-                    <div className="p-6 rounded-xl bg-primary/10 border border-primary/30">
-                      <div className="flex items-start gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
-                          <LogIn className="w-6 h-6 text-primary" />
-                        </div>
-                        <div className="flex-1">
-                          <h4 className="font-display text-lg mb-2">Connexion requise</h4>
-                          <p className="text-sm text-muted-foreground mb-4">
-                            Pour réserver votre cours d'essai gratuit, vous devez être connecté à votre compte.
-                            Cela nous permet de vous garantir un seul essai gratuit par client.
-                          </p>
-                          <div className="flex flex-col sm:flex-row gap-3">
-                            <Button 
-                              variant="hero"
-                              onClick={() => navigate("/auth?redirect=/#booking")}
-                            >
-                              <LogIn className="w-4 h-4 mr-2" />
-                              Se connecter
-                            </Button>
-                            <Button 
-                              variant="outline"
-                              onClick={() => navigate("/auth?redirect=/#booking")}
-                            >
-                              Créer un compte
-                            </Button>
-                          </div>
-                        </div>
+                          <LogIn className="w-5 h-5 mr-2" />
+                          Se connecter
+                        </Button>
+                        <Button 
+                          variant="outline"
+                          size="lg"
+                          onClick={() => navigate("/auth?redirect=/#booking")}
+                        >
+                          Créer un compte
+                        </Button>
                       </div>
                     </div>
-                  )}
+                  ) : (
+                    <>
+                      <h3 className="font-display text-2xl text-center mb-8">Choisissez votre type de rendez-vous</h3>
+                      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {appointmentTypes.map((type) => {
+                          const isSessionType = type.id === "session";
+                          const nonTrialPasses = activePasses.filter(p => p.pass_type !== "trial");
+                          const hasValidPass = isSessionType && isLoggedIn && nonTrialPasses.length > 0;
+                          const isDisabled = isSessionType && isLoggedIn && nonTrialPasses.length === 0;
+                          
+                          return (
+                            <button
+                              key={type.id}
+                              onClick={() => handleTypeSelect(type)}
+                              disabled={trialEligibility.checking || isDisabled}
+                              className={`p-6 rounded-xl border transition-all duration-300 text-left hover:border-primary/50 ${
+                                formData.type === type.id 
+                                  ? "border-primary bg-primary/10" 
+                                  : "border-border bg-card"
+                              } ${trialEligibility.checking || isDisabled ? "opacity-50 cursor-not-allowed" : ""}`}
+                            >
+                              <span className="text-3xl mb-4 block">{type.icon}</span>
+                              <span className="font-medium">{type.label}</span>
+                              {!type.showCalendar && (
+                                <span className="block text-xs text-muted-foreground mt-2">Remplir le formulaire →</span>
+                              )}
+                              {isSessionType && hasValidPass && (
+                                <span className="block text-xs text-primary mt-2">
+                                  {nonTrialPasses.reduce((sum, p) => sum + p.remaining_sessions, 0)} séance(s) disponible(s)
+                                </span>
+                              )}
+                              {isSessionType && isLoggedIn && nonTrialPasses.length === 0 && (
+                                <span className="block text-xs text-muted-foreground mt-2">Aucun pass actif</span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
 
-                  {/* Trial already used message */}
-                  {formData.type === "trial" && isLoggedIn && trialEligibility.checked && !trialEligibility.eligible && (
-                    <div className="p-6 rounded-xl bg-orange-500/10 border border-orange-500/30">
-                      <div className="flex items-start gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-orange-500/20 flex items-center justify-center flex-shrink-0">
-                          <AlertCircle className="w-6 h-6 text-orange-500" />
-                        </div>
-                        <div className="flex-1">
-                          <h4 className="font-display text-lg mb-2 text-orange-400">Cours d'essai déjà utilisé</h4>
-                          <p className="text-sm text-foreground mb-2 font-medium">
-                            ⚠️ Un seul cours d'essai gratuit est disponible par personne.
-                          </p>
-                          <p className="text-sm text-muted-foreground mb-4">
-                            Vous avez déjà bénéficié de votre essai gratuit avec ce compte.
-                            Pour continuer votre entraînement, découvrez nos offres avantageuses :
-                          </p>
-                          <ul className="text-sm text-muted-foreground mb-4 space-y-1">
-                            <li>• Carte de 5 cours</li>
-                            <li>• Carte de 10 cours</li>
-                            <li>• Abonnement mensuel illimité</li>
-                          </ul>
-                          <div className="flex flex-col sm:flex-row gap-3">
-                            <Button 
-                              variant="hero"
-                              onClick={() => {
-                                const pricingSection = document.getElementById("pricing");
-                                if (pricingSection) {
-                                  pricingSection.scrollIntoView({ behavior: "smooth" });
-                                } else {
-                                  const contactSection = document.getElementById("contact");
-                                  contactSection?.scrollIntoView({ behavior: "smooth" });
-                                }
-                              }}
-                            >
-                              <ShoppingBag className="w-4 h-4 mr-2" />
-                              Voir les offres
-                            </Button>
-                            <Button 
-                              variant="outline"
-                              onClick={() => {
-                                const contactSection = document.getElementById("contact");
-                                contactSection?.scrollIntoView({ behavior: "smooth" });
-                              }}
-                            >
-                              <Mail className="w-4 h-4 mr-2" />
-                              Nous contacter
-                            </Button>
+                      {/* Trial already used message */}
+                      {formData.type === "trial" && trialEligibility.checked && !trialEligibility.eligible && (
+                        <div className="p-6 rounded-xl bg-orange-500/10 border border-orange-500/30">
+                          <div className="flex items-start gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-orange-500/20 flex items-center justify-center flex-shrink-0">
+                              <AlertCircle className="w-6 h-6 text-orange-500" />
+                            </div>
+                            <div className="flex-1">
+                              <h4 className="font-display text-lg mb-2 text-orange-400">Cours d'essai déjà utilisé</h4>
+                              <p className="text-sm text-foreground mb-2 font-medium">
+                                ⚠️ Un seul cours d'essai gratuit est disponible par personne.
+                              </p>
+                              <p className="text-sm text-muted-foreground mb-4">
+                                Vous avez déjà bénéficié de votre essai gratuit avec ce compte.
+                                Pour continuer votre entraînement, découvrez nos offres avantageuses :
+                              </p>
+                              <ul className="text-sm text-muted-foreground mb-4 space-y-1">
+                                <li>• Carte de 5 cours</li>
+                                <li>• Carte de 10 cours</li>
+                                <li>• Abonnement mensuel illimité</li>
+                              </ul>
+                              <div className="flex flex-col sm:flex-row gap-3">
+                                <Button 
+                                  variant="hero"
+                                  onClick={() => {
+                                    const pricingSection = document.getElementById("pricing");
+                                    if (pricingSection) {
+                                      pricingSection.scrollIntoView({ behavior: "smooth" });
+                                    } else {
+                                      const contactSection = document.getElementById("contact");
+                                      contactSection?.scrollIntoView({ behavior: "smooth" });
+                                    }
+                                  }}
+                                >
+                                  <ShoppingBag className="w-4 h-4 mr-2" />
+                                  Voir les offres
+                                </Button>
+                                <Button 
+                                  variant="outline"
+                                  onClick={() => {
+                                    const contactSection = document.getElementById("contact");
+                                    contactSection?.scrollIntoView({ behavior: "smooth" });
+                                  }}
+                                >
+                                  <Mail className="w-4 h-4 mr-2" />
+                                  Nous contacter
+                                </Button>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </div>
-                  )}
+                      )}
 
-                  {/* Loading state while checking eligibility */}
-                  {trialEligibility.checking && (
-                    <div className="p-6 rounded-xl bg-muted/50 border border-border text-center">
-                      <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                      <p className="text-muted-foreground">Vérification de votre éligibilité...</p>
-                    </div>
-                  )}
-
-                  {/* Session login prompt - shown when session is selected but user not logged in */}
-                  {formData.type === "session" && !isLoggedIn && (
-                    <div className="p-6 rounded-xl bg-primary/10 border border-primary/30">
-                      <div className="flex items-start gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
-                          <LogIn className="w-6 h-6 text-primary" />
+                      {/* Loading state while checking eligibility */}
+                      {trialEligibility.checking && (
+                        <div className="p-6 rounded-xl bg-muted/50 border border-border text-center">
+                          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                          <p className="text-muted-foreground">Vérification de votre éligibilité...</p>
                         </div>
-                        <div className="flex-1">
-                          <h4 className="font-display text-lg mb-2">Connexion requise</h4>
-                          <p className="text-sm text-muted-foreground mb-4">
-                            Pour réserver une séance avec votre laissez-passer, vous devez être connecté à votre compte.
-                          </p>
-                          <div className="flex flex-col sm:flex-row gap-3">
-                            <Button 
-                              variant="hero"
-                              onClick={() => navigate("/auth?redirect=/#booking")}
-                            >
-                              <LogIn className="w-4 h-4 mr-2" />
-                              Se connecter
-                            </Button>
-                            <Button 
-                              variant="outline"
-                              onClick={() => navigate("/auth?redirect=/#booking")}
-                            >
-                              Créer un compte
-                            </Button>
+                      )}
+
+                      {/* Session no pass message */}
+                      {formData.type === "session" && activePasses.filter(p => p.pass_type !== "trial").length === 0 && (
+                        <div className="p-6 rounded-xl bg-secondary/10 border border-secondary/30">
+                          <div className="flex items-start gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-secondary/20 flex items-center justify-center flex-shrink-0">
+                              <Ticket className="w-6 h-6 text-secondary" />
+                            </div>
+                            <div className="flex-1">
+                              <h4 className="font-display text-lg mb-2">Aucun laissez-passer actif</h4>
+                              <p className="text-sm text-muted-foreground mb-4">
+                                Vous n'avez pas de laissez-passer actif avec des séances disponibles.
+                                Achetez un pass pour réserver vos séances facilement !
+                              </p>
+                              <div className="flex flex-col sm:flex-row gap-3">
+                                <Button 
+                                  variant="hero"
+                                  onClick={() => {
+                                    const pricingSection = document.getElementById("pricing");
+                                    if (pricingSection) {
+                                      pricingSection.scrollIntoView({ behavior: "smooth" });
+                                    } else {
+                                      const contactSection = document.getElementById("contact");
+                                      contactSection?.scrollIntoView({ behavior: "smooth" });
+                                    }
+                                  }}
+                                >
+                                  <ShoppingBag className="w-4 h-4 mr-2" />
+                                  Voir les offres
+                                </Button>
+                                <Button 
+                                  variant="outline"
+                                  onClick={() => {
+                                    const contactSection = document.getElementById("contact");
+                                    contactSection?.scrollIntoView({ behavior: "smooth" });
+                                  }}
+                                >
+                                  <Mail className="w-4 h-4 mr-2" />
+                                  Nous contacter
+                                </Button>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Session no pass message */}
-                  {formData.type === "session" && isLoggedIn && activePasses.filter(p => p.pass_type !== "trial").length === 0 && (
-                    <div className="p-6 rounded-xl bg-secondary/10 border border-secondary/30">
-                      <div className="flex items-start gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-secondary/20 flex items-center justify-center flex-shrink-0">
-                          <Ticket className="w-6 h-6 text-secondary" />
-                        </div>
-                        <div className="flex-1">
-                          <h4 className="font-display text-lg mb-2">Aucun laissez-passer actif</h4>
-                          <p className="text-sm text-muted-foreground mb-4">
-                            Vous n'avez pas de laissez-passer actif avec des séances disponibles.
-                            Achetez un pass pour réserver vos séances facilement !
-                          </p>
-                          <div className="flex flex-col sm:flex-row gap-3">
-                            <Button 
-                              variant="hero"
-                              onClick={() => {
-                                const pricingSection = document.getElementById("pricing");
-                                if (pricingSection) {
-                                  pricingSection.scrollIntoView({ behavior: "smooth" });
-                                } else {
-                                  const contactSection = document.getElementById("contact");
-                                  contactSection?.scrollIntoView({ behavior: "smooth" });
-                                }
-                              }}
-                            >
-                              <ShoppingBag className="w-4 h-4 mr-2" />
-                              Voir les offres
-                            </Button>
-                            <Button 
-                              variant="outline"
-                              onClick={() => {
-                                const contactSection = document.getElementById("contact");
-                                contactSection?.scrollIntoView({ behavior: "smooth" });
-                              }}
-                            >
-                              <Mail className="w-4 h-4 mr-2" />
-                              Nous contacter
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}

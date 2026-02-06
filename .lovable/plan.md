@@ -1,9 +1,9 @@
 
 
-# Sélection de Client pour Ajouter un Admin
+# Ajouter l'option "Rester connecté" à la page de connexion
 
 ## Objectif
-Remplacer le champ de saisie email par un sélecteur déroulant permettant de choisir un client existant dans la liste lors de l'ajout d'un administrateur (même fonctionnalité que pour les employés).
+Ajouter une case à cocher "Rester connecté" sur le formulaire de connexion qui permet de contrôler la persistance de la session utilisateur.
 
 ---
 
@@ -12,23 +12,22 @@ Remplacer le champ de saisie email par un sélecteur déroulant permettant de ch
 ### Avant (actuel)
 ```text
 +------------------------------------------+
-|  Ajouter un administrateur               |
-+------------------------------------------+
 |  Email: [_____________________]          |
-|  Nom:   [_____________________]          |
+|  Mot de passe: [______________] 👁       |
+|                                          |
+|         [ Se connecter ]                 |
 +------------------------------------------+
 ```
 
 ### Après (modifié)
 ```text
 +------------------------------------------+
-|  Ajouter un administrateur               |
-+------------------------------------------+
-|  Client: [Sélectionner un client ▼]      |
-|          └─ Jean Dupont (jean@email.com) |
-|          └─ Marie Martin (marie@...)     |
-|          └─ ...                          |
-|  Nom:   [Jean Dupont] (pré-rempli)       |
+|  Email: [_____________________]          |
+|  Mot de passe: [______________] 👁       |
+|                                          |
+|  [✓] Rester connecté                     |
+|                                          |
+|         [ Se connecter ]                 |
 +------------------------------------------+
 ```
 
@@ -36,156 +35,166 @@ Remplacer le champ de saisie email par un sélecteur déroulant permettant de ch
 
 ## 2. Comportement attendu
 
-1. Quand l'admin clique sur "Ajouter un administrateur", un sélecteur affiche la liste des clients disponibles
-2. Chaque option du sélecteur affiche : **Nom (email)**
-3. Quand un client est sélectionné :
-   - Le champ "Nom affiché" est automatiquement pré-rempli avec le nom du client
-   - L'admin peut modifier ce nom si souhaité
-4. La liste n'affiche que les clients qui ne sont pas déjà admin ou employé
+| Option | Comportement |
+|--------|--------------|
+| **Cochée** | La session persiste après fermeture du navigateur (localStorage) |
+| **Non cochée** | La session expire à la fermeture du navigateur (sessionStorage) |
+
+- La case est affichée **uniquement** en mode connexion (pas en inscription)
+- Par défaut, la case est **cochée** pour une meilleure expérience utilisateur
 
 ---
 
 ## 3. Modifications techniques
 
 ### Fichier à modifier
-`src/pages/admin/AdminUsersPage.tsx`
+`src/pages/auth/AuthPage.tsx`
 
 ### Changements de state
 
-```typescript
-// Remplacer
-const [newAdminEmail, setNewAdminEmail] = useState("");
+Ajouter un nouvel état pour gérer l'option :
 
-// Par
-const [selectedAdminClientId, setSelectedAdminClientId] = useState<string>("");
+```typescript
+const [rememberMe, setRememberMe] = useState(true);
 ```
 
-### Ajout d'un memo pour les clients disponibles (admins)
+### Mise à jour de handleLogin
 
-Réutiliser la même logique que `availableClientsForEmployee` :
-
-```typescript
-const availableClientsForAdmin = useMemo(() => {
-  const adminUserIds = admins.map(a => a.user_id);
-  const employeeUserIds = employees.map(e => e.user_id);
-  const excludedIds = [...adminUserIds, ...employeeUserIds];
-  return allProfiles.filter(p => !excludedIds.includes(p.user_id));
-}, [allProfiles, admins, employees]);
-```
-
-Note: C'est identique à `availableClientsForEmployee`, donc on peut les fusionner en un seul memo.
-
-### Mise à jour du dialogue d'ajout admin (lignes 590-638)
-
-Remplacer le champ Input email par un composant Select :
+Modifier la fonction de connexion pour utiliser le bon type de stockage :
 
 ```typescript
-<div className="space-y-2">
-  <Label htmlFor="clientSelect">Sélectionner un client</Label>
-  <Select
-    value={selectedAdminClientId}
-    onValueChange={(value) => {
-      setSelectedAdminClientId(value);
-      // Auto-remplir le nom
-      const selectedClient = allProfiles.find(c => c.user_id === value);
-      if (selectedClient) {
-        setNewAdminName(selectedClient.full_name || "");
-      }
-      setError("");
-    }}
-  >
-    <SelectTrigger>
-      <SelectValue placeholder="Choisir un client..." />
-    </SelectTrigger>
-    <SelectContent>
-      {availableClientsForAdmin.map((client) => (
-        <SelectItem key={client.user_id} value={client.user_id}>
-          {client.full_name || "Sans nom"} ({client.email})
-        </SelectItem>
-      ))}
-    </SelectContent>
-  </Select>
-</div>
-```
-
-### Mise à jour de handleAddAdmin
-
-```typescript
-const handleAddAdmin = async (e: React.FormEvent) => {
+const handleLogin = async (e: React.FormEvent) => {
   e.preventDefault();
-  setError("");
+  setErrors({});
 
-  // Validation du client sélectionné
-  if (!selectedAdminClientId) {
-    setError("Veuillez sélectionner un client");
-    return;
+  // ... validation existante ...
+
+  setLoading(true);
+  
+  // Configurer le stockage selon l'option "Rester connecté"
+  if (!rememberMe) {
+    // Session temporaire - expire à la fermeture du navigateur
+    await supabase.auth.signOut(); // Clear any existing session
   }
+  
+  const { error } = await supabase.auth.signInWithPassword({
+    email: formData.email,
+    password: formData.password,
+  });
 
-  if (!newAdminName.trim()) {
-    setError("Le nom est requis");
-    return;
-  }
-
-  setAdding(true);
-
-  // Check if already admin (double check)
-  const { data: existingAdmin } = await supabase
-    .from("admin_users")
-    .select("id")
-    .eq("user_id", selectedAdminClientId)
-    .maybeSingle();
-
-  if (existingAdmin) {
-    setAdding(false);
-    setError("Cet utilisateur est déjà administrateur");
-    return;
-  }
-
-  // Add to admin_users
-  const { error: insertError } = await supabase
-    .from("admin_users")
-    .insert({ user_id: selectedAdminClientId, name: newAdminName.trim() });
-
-  // ... reste inchangé
+  // ... gestion d'erreur existante ...
 };
 ```
 
-### Mise à jour de la réinitialisation du dialogue
+### Ajout du composant Checkbox dans le formulaire
+
+Ajouter entre le champ mot de passe et le bouton de connexion :
 
 ```typescript
-// Dans setDialogOpen(false)
-setDialogOpen(false);
-setSelectedAdminClientId(""); // Au lieu de setNewAdminEmail("")
-setNewAdminName("");
+{isLogin && (
+  <div className="flex items-center space-x-2">
+    <Checkbox
+      id="rememberMe"
+      checked={rememberMe}
+      onCheckedChange={(checked) => setRememberMe(checked === true)}
+    />
+    <Label 
+      htmlFor="rememberMe" 
+      className="text-sm font-normal cursor-pointer"
+    >
+      Rester connecté
+    </Label>
+  </div>
+)}
+```
+
+### Imports à ajouter
+
+```typescript
+import { Checkbox } from "@/components/ui/checkbox";
 ```
 
 ---
 
-## 4. Nettoyage
+## 4. Gestion du stockage de session
 
-- Supprimer l'import du schéma email `z.string().email()` s'il n'est plus utilisé ailleurs
-- Supprimer la validation email dans `handleAddAdmin`
-- Supprimer la variable `emailSchema` si elle n'est plus nécessaire
+Pour implémenter correctement le "Rester connecté", on va utiliser une approche basée sur le nettoyage de session au démarrage :
+
+1. Si `rememberMe` est **false** :
+   - Stocker un flag dans `sessionStorage` indiquant une session temporaire
+   - Au prochain chargement de la page (après fermeture du navigateur), le flag n'existera plus
+   - On peut alors vérifier et déconnecter automatiquement
+
+2. Si `rememberMe` est **true** :
+   - Comportement par défaut de Supabase (persistSession: true dans le client)
+
+### Implémentation simplifiée
+
+La solution la plus simple est d'utiliser `sessionStorage` pour marquer les sessions temporaires :
+
+```typescript
+const handleLogin = async (e: React.FormEvent) => {
+  // ... validation ...
+
+  setLoading(true);
+  
+  const { error } = await supabase.auth.signInWithPassword({
+    email: formData.email,
+    password: formData.password,
+  });
+
+  if (!error && !rememberMe) {
+    // Marquer comme session temporaire
+    sessionStorage.setItem('temp_session', 'true');
+  }
+  
+  // ... reste de la logique ...
+};
+```
+
+Et dans le useEffect initial :
+
+```typescript
+useEffect(() => {
+  // Vérifier si c'était une session temporaire qui ne devrait pas persister
+  const wasTemporarySession = sessionStorage.getItem('temp_session');
+  
+  // Si sessionStorage est vide mais qu'on a une session, 
+  // c'est un nouveau chargement après fermeture du navigateur
+  // Note: sessionStorage se vide à la fermeture du navigateur
+  
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    (event, session) => {
+      // ... logique existante ...
+    }
+  );
+
+  // ... reste du code ...
+}, [navigate]);
+```
 
 ---
 
-## 5. Avantages
+## 5. Position dans le formulaire
 
-| Avant | Après |
-|-------|-------|
-| Saisie manuelle d'email | Sélection dans une liste |
-| Risque d'erreur de frappe | Pas d'erreur possible |
-| Pas de visibilité sur les clients | Voit tous les clients disponibles |
-| Message d'erreur si email non trouvé | Liste pré-filtrée |
+La checkbox sera placée après le champ mot de passe et avant le bouton de soumission, uniquement visible en mode connexion :
+
+```text
+Ligne 284: {errors.password && ...}
+         </div>
+
++++ NOUVEAU: Checkbox "Rester connecté" +++
+
+Ligne 286: {!isLogin && (
+```
 
 ---
 
 ## Résumé des modifications
 
-1. Remplacer le state `newAdminEmail` par `selectedAdminClientId`
-2. Créer ou réutiliser un memo `availableClientsForAdmin` (identique à `availableClientsForEmployee`)
-3. Modifier le dialogue admin pour afficher un Select au lieu d'un Input email
-4. Auto-remplir le nom quand un client est sélectionné
-5. Adapter `handleAddAdmin` pour utiliser `selectedAdminClientId` directement
-6. Nettoyer le code (supprimer la validation email devenue inutile)
+1. Importer le composant `Checkbox` depuis `@/components/ui/checkbox`
+2. Ajouter l'état `rememberMe` (défaut: `true`)
+3. Ajouter la checkbox dans le formulaire (visible uniquement en mode connexion)
+4. Marquer les sessions temporaires avec `sessionStorage`
+5. Vérifier au chargement si la session devrait être déconnectée
 

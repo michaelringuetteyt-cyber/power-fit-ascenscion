@@ -10,6 +10,7 @@ import AdminChatPage from "./pages/admin/AdminChatPage";
 import AdminContentPage from "./pages/admin/AdminContentPage";
 import AdminBookingsPage from "./pages/admin/AdminBookingsPage";
 import AdminUsersPage from "./pages/admin/AdminUsersPage";
+import AdminStatsPage from "./pages/admin/AdminStatsPage";
 import ClientDashboard from "./pages/client/ClientDashboard";
 import ClientProfile from "./pages/client/ClientProfile";
 import ClientBookings from "./pages/client/ClientBookings";
@@ -42,6 +43,7 @@ const App = () => (
           <Route path="/admin/content" element={<AdminContentPage />} />
           <Route path="/admin/bookings" element={<AdminBookingsPage />} />
           <Route path="/admin/users" element={<AdminUsersPage />} />
+          <Route path="/admin/stats" element={<AdminStatsPage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

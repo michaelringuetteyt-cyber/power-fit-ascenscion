@@ -18,6 +18,7 @@ import {
   Receipt,
   ChevronDown,
   ChevronUp,
+  BarChart3,
 } from "lucide-react";
 import { User } from "@supabase/supabase-js";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -235,6 +236,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
 
   const adminNavItems = [
     { path: "/admin", icon: LayoutDashboard, label: "Dashboard" },
+    { path: "/admin/stats", icon: BarChart3, label: "Statistiques" },
     { path: "/admin/chat", icon: MessageCircle, label: "Messages", badge: unreadCount },
     { path: "/admin/bookings", icon: CalendarDays, label: "Réservations" },
     { path: "/admin/content", icon: Image, label: "Contenu" },

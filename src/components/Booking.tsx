@@ -305,21 +305,33 @@ const Booking = () => {
     }
   };
 
+  /**
+   * BOOKING LOGIC - Important rules to prevent booking issues:
+   * 
+   * 1. ALL pass types (trial, 5_sessions, 10_sessions, monthly) can be used for booking
+   * 2. Trial passes are NOT excluded from any booking flow
+   * 3. "Cours d'essai gratuit" option: 
+   *    - If user has existing trial pass with sessions → use it
+   *    - If not → check eligibility for new trial pass
+   * 4. "Séance avec laissez-passer" option:
+   *    - Works with ANY pass type including trial
+   *    - Requires at least 1 active pass with remaining sessions
+   */
   const handleTypeSelect = (type: typeof appointmentTypes[0]) => {
     setFormData({ ...formData, type: type.id });
     setSelectedPass(null);
     
+    // All booking types require authentication
+    if (!isLoggedIn && (type.id === "trial" || type.id === "session")) {
+      return; // UI will show login prompt
+    }
+
     if (type.id === "trial") {
-      // Trial requires authentication
-      if (!isLoggedIn) {
-        // Will show login prompt, don't advance step
-        return;
-      }
-      
-      // Check if user already has an active trial pass with remaining sessions
+      // First check if user already has an active trial pass they can use
       const existingTrialPass = activePasses.find(p => p.pass_type === "trial" && p.remaining_sessions > 0);
+      
       if (existingTrialPass) {
-        // User already has a trial pass with sessions - let them use it
+        // User has a trial pass with sessions remaining - let them use it directly
         setSelectedPass(existingTrialPass);
         setTrialEligibility({
           checked: true,
@@ -331,7 +343,7 @@ const Booking = () => {
         return;
       }
       
-      // User doesn't have an active trial pass, check eligibility for new one
+      // No active trial pass - check if user is eligible for a new one
       if (userId) {
         checkTrialEligibility(userId);
       }
@@ -339,18 +351,18 @@ const Booking = () => {
     }
 
     if (type.id === "session") {
-      // Session with pass requires authentication and active pass
-      if (!isLoggedIn) {
+      // Session booking requires at least one pass with remaining sessions
+      // IMPORTANT: Include ALL pass types (trial, 5_sessions, 10_sessions, monthly)
+      const availablePasses = activePasses.filter(p => p.remaining_sessions > 0);
+      
+      if (availablePasses.length === 0) {
+        // No passes available - UI will show "buy pass" message
         return;
       }
-      // Check if user has active passes (including trial)
-      if (activePasses.length === 0) {
-        // No passes available - will show message
-        return;
-      }
-      // If only one pass, auto-select it
-      if (activePasses.length === 1) {
-        setSelectedPass(activePasses[0]);
+      
+      // Auto-select if user has only one pass
+      if (availablePasses.length === 1) {
+        setSelectedPass(availablePasses[0]);
       }
       setStep(2);
       return;
@@ -633,9 +645,14 @@ const Booking = () => {
                         {appointmentTypes.map((type) => {
                           const isSessionType = type.id === "session";
                           const isTrialType = type.id === "trial";
-                          const trialPass = activePasses.find(p => p.pass_type === "trial" && p.remaining_sessions > 0);
-                          const hasValidPass = isSessionType && isLoggedIn && activePasses.length > 0;
-                          const isDisabled = isSessionType && isLoggedIn && activePasses.length === 0;
+                          
+                          // Calculate available passes (all types with remaining sessions)
+                          const availablePasses = activePasses.filter(p => p.remaining_sessions > 0);
+                          const trialPass = availablePasses.find(p => p.pass_type === "trial");
+                          const totalSessions = availablePasses.reduce((sum, p) => sum + p.remaining_sessions, 0);
+                          
+                          // Session type is disabled only if NO passes are available
+                          const isDisabled = isSessionType && availablePasses.length === 0;
                           
                           return (
                             <button
@@ -658,12 +675,12 @@ const Booking = () => {
                                   {trialPass.remaining_sessions} séance(s) d'essai disponible(s)
                                 </span>
                               )}
-                              {isSessionType && hasValidPass && (
+                              {isSessionType && availablePasses.length > 0 && (
                                 <span className="block text-xs text-primary mt-2">
-                                  {activePasses.reduce((sum, p) => sum + p.remaining_sessions, 0)} séance(s) disponible(s)
+                                  {totalSessions} séance(s) disponible(s)
                                 </span>
                               )}
-                              {isSessionType && isLoggedIn && activePasses.length === 0 && (
+                              {isSessionType && availablePasses.length === 0 && (
                                 <span className="block text-xs text-muted-foreground mt-2">Aucun pass actif</span>
                               )}
                             </button>
@@ -732,8 +749,8 @@ const Booking = () => {
                         </div>
                       )}
 
-                      {/* Session no pass message */}
-                      {formData.type === "session" && activePasses.length === 0 && (
+                      {/* Session no pass message - shows when user has no passes with remaining sessions */}
+                      {formData.type === "session" && activePasses.filter(p => p.remaining_sessions > 0).length === 0 && (
                         <div className="p-6 rounded-xl bg-secondary/10 border border-secondary/30">
                           <div className="flex items-start gap-4">
                             <div className="w-12 h-12 rounded-xl bg-secondary/20 flex items-center justify-center flex-shrink-0">

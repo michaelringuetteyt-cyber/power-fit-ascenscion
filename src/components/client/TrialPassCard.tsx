@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, RefObject } from "react";
 import { MapPin, Users, Sparkles, Maximize2, X, Download } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -13,44 +13,18 @@ interface TrialPassCardProps {
   remainingSessions: number;
 }
 
-function TrialPassCard({ clientName, status, remainingSessions }: TrialPassCardProps) {
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const passRef = useRef<HTMLDivElement>(null);
-  const dialogPassRef = useRef<HTMLDivElement>(null);
-  const currentYear = new Date().getFullYear();
-  const isUsed = remainingSessions === 0 || status === "used";
+interface PassCardContentProps {
+  passRef: RefObject<HTMLDivElement>;
+  isUsed: boolean;
+  currentYear: number;
+  clientName: string;
+  isDialog?: boolean;
+}
 
-  const handleDownload = async () => {
-    const targetRef = isFullscreen ? dialogPassRef : passRef;
-    if (!targetRef.current) return;
-
-    setIsDownloading(true);
-    try {
-      const canvas = await html2canvas(targetRef.current, {
-        backgroundColor: "#0a0a0f",
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-      });
-
-      const link = document.createElement("a");
-      link.download = `laissez-passer-powerfit-${clientName || "client"}.png`;
-      link.href = canvas.toDataURL("image/png");
-      link.click();
-
-      toast.success("Laissez-passer téléchargé !");
-    } catch (error) {
-      console.error("Erreur lors du téléchargement:", error);
-      toast.error("Erreur lors du téléchargement");
-    } finally {
-      setIsDownloading(false);
-    }
-  };
-
-  const PassContent = ({ isDialog = false, innerRef }: { isDialog?: boolean; innerRef?: React.RefObject<HTMLDivElement> }) => (
+function PassCardContent({ passRef, isUsed, currentYear, clientName, isDialog = false }: PassCardContentProps) {
+  return (
     <div 
-      ref={innerRef}
+      ref={passRef}
       className={`relative overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-br from-background via-muted/50 to-background ${isDialog ? "w-full max-w-lg mx-auto" : ""}`}
     >
       {/* Background image with overlay */}
@@ -136,11 +110,52 @@ function TrialPassCard({ clientName, status, remainingSessions }: TrialPassCardP
       </div>
     </div>
   );
+}
+
+function TrialPassCard({ clientName, status, remainingSessions }: TrialPassCardProps) {
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const passRef = useRef<HTMLDivElement>(null);
+  const dialogPassRef = useRef<HTMLDivElement>(null);
+  const currentYear = new Date().getFullYear();
+  const isUsed = remainingSessions === 0 || status === "used";
+
+  const handleDownload = async () => {
+    const targetRef = isFullscreen ? dialogPassRef : passRef;
+    if (!targetRef.current) return;
+
+    setIsDownloading(true);
+    try {
+      const canvas = await html2canvas(targetRef.current, {
+        backgroundColor: "#0a0a0f",
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+      });
+
+      const link = document.createElement("a");
+      link.download = `laissez-passer-powerfit-${clientName || "client"}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+
+      toast.success("Laissez-passer téléchargé !");
+    } catch (error) {
+      console.error("Erreur lors du téléchargement:", error);
+      toast.error("Erreur lors du téléchargement");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   return (
     <>
       <div className="relative group">
-        <PassContent innerRef={passRef} />
+        <PassCardContent 
+          passRef={passRef}
+          isUsed={isUsed}
+          currentYear={currentYear}
+          clientName={clientName}
+        />
         
         {/* Action buttons */}
         <div className="absolute top-4 right-4 z-20 flex gap-2 opacity-0 group-hover:opacity-100 md:opacity-100 transition-opacity">
@@ -176,7 +191,13 @@ function TrialPassCard({ clientName, status, remainingSessions }: TrialPassCardP
             >
               <X className="w-5 h-5" />
             </button>
-            <PassContent isDialog innerRef={dialogPassRef} />
+            <PassCardContent 
+              passRef={dialogPassRef}
+              isUsed={isUsed}
+              currentYear={currentYear}
+              clientName={clientName}
+              isDialog
+            />
             <div className="flex flex-col items-center gap-3 mt-4">
               <p className="text-muted-foreground text-sm">
                 Présentez ce laissez-passer à l'accueil
@@ -196,6 +217,6 @@ function TrialPassCard({ clientName, status, remainingSessions }: TrialPassCardP
       </Dialog>
     </>
   );
-};
+}
 
 export default TrialPassCard;

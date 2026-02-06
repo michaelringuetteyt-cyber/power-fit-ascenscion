@@ -17,8 +17,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Ticket, Plus, User, History, Edit2, CalendarCheck, MinusCircle } from "lucide-react";
+import { Ticket, Plus, User, History, Edit2, CalendarCheck, MinusCircle, Trash2, Minus } from "lucide-react";
 import { format, addDays } from "date-fns";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { fr } from "date-fns/locale";
 
 interface Profile {
@@ -83,6 +93,10 @@ const PassManagement = () => {
   const [newSessions, setNewSessions] = useState("");
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [deductions, setDeductions] = useState<SessionDeduction[]>([]);
+  const [deletePassDialogOpen, setDeletePassDialogOpen] = useState(false);
+  const [passToDelete, setPassToDelete] = useState<Pass | null>(null);
+  const [deletingPass, setDeletingPass] = useState(false);
+  const [deductingSession, setDeductingSession] = useState<string | null>(null);
   
   // Form state
   const [passType, setPassType] = useState("");
@@ -273,6 +287,121 @@ const PassManagement = () => {
     setEditDialogOpen(true);
   };
 
+  const openDeletePassDialog = (pass: Pass) => {
+    setPassToDelete(pass);
+    setDeletePassDialogOpen(true);
+  };
+
+  const handleDeletePass = async () => {
+    if (!passToDelete) return;
+    
+    setDeletingPass(true);
+
+    try {
+      // Delete associated deductions first
+      await supabase
+        .from("session_deductions")
+        .delete()
+        .eq("pass_id", passToDelete.id);
+
+      // Delete the pass
+      const { error } = await supabase
+        .from("passes")
+        .delete()
+        .eq("id", passToDelete.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Pass supprimé",
+        description: "Le laissez-passer a été supprimé avec succès",
+      });
+
+      // Refresh data
+      loadClients();
+      if (selectedClient) {
+        loadPurchaseHistory({
+          ...selectedClient,
+          activePasses: selectedClient.activePasses.filter(p => p.id !== passToDelete.id),
+        });
+      }
+    } catch (err) {
+      console.error("Delete pass error:", err);
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer le pass",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingPass(false);
+      setDeletePassDialogOpen(false);
+      setPassToDelete(null);
+    }
+  };
+
+  const handleManualDeduction = async (pass: Pass) => {
+    if (pass.remaining_sessions <= 0 || pass.remaining_sessions > 900) return;
+    
+    setDeductingSession(pass.id);
+
+    try {
+      const newRemaining = pass.remaining_sessions - 1;
+
+      // Update the pass
+      const { error: updateError } = await supabase
+        .from("passes")
+        .update({ 
+          remaining_sessions: newRemaining,
+          status: newRemaining === 0 ? "used" : "active"
+        })
+        .eq("id", pass.id);
+
+      if (updateError) throw updateError;
+
+      // Log the deduction
+      const { error: insertError } = await supabase
+        .from("session_deductions")
+        .insert({
+          user_id: pass.user_id,
+          pass_id: pass.id,
+          pass_type: pass.pass_type,
+          remaining_after: newRemaining,
+          notes: "Déduction manuelle par l'administrateur"
+        });
+
+      if (insertError) throw insertError;
+
+      toast({
+        title: "Séance déduite",
+        description: `${newRemaining} séance${newRemaining > 1 ? "s" : ""} restante${newRemaining > 1 ? "s" : ""}`,
+      });
+
+      // Refresh data
+      loadClients();
+      if (selectedClient) {
+        // Reload history with updated data
+        const updatedPasses = selectedClient.activePasses.map(p => 
+          p.id === pass.id ? { ...p, remaining_sessions: newRemaining, status: newRemaining === 0 ? "used" : "active" } : p
+        ).filter(p => p.status === "active");
+        
+        loadPurchaseHistory({
+          ...selectedClient,
+          activePasses: updatedPasses,
+          totalRemainingSessions: updatedPasses.reduce((sum, p) => sum + p.remaining_sessions, 0),
+        });
+      }
+    } catch (err) {
+      console.error("Deduction error:", err);
+      toast({
+        title: "Erreur",
+        description: "Impossible de déduire la séance",
+        variant: "destructive",
+      });
+    } finally {
+      setDeductingSession(null);
+    }
+  };
+
   const getPassTypeLabel = (type: string) => {
     return PASS_TYPES.find(p => p.value === type)?.label || type;
   };
@@ -431,21 +560,45 @@ const PassManagement = () => {
                 </h4>
                 <div className="space-y-2">
                   {selectedClient.activePasses.map((pass) => (
-                    <div key={pass.id} className="p-3 bg-muted/50 rounded-lg flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">{getPassTypeLabel(pass.pass_type)}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {pass.remaining_sessions > 900 ? "Illimité" : `${pass.remaining_sessions} séances restantes`}
-                          {pass.expiry_date && ` • Expire le ${format(new Date(pass.expiry_date), "d MMM yyyy", { locale: fr })}`}
-                        </p>
+                    <div key={pass.id} className="p-3 bg-muted/50 rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <p className="font-medium">{getPassTypeLabel(pass.pass_type)}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {pass.remaining_sessions > 900 ? "Illimité" : `${pass.remaining_sessions} séances restantes`}
+                            {pass.expiry_date && ` • Expire le ${format(new Date(pass.expiry_date), "d MMM yyyy", { locale: fr })}`}
+                          </p>
+                        </div>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openEditDialog(pass)}
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </Button>
+                      <div className="flex items-center gap-2 pt-2 border-t border-border/50">
+                        {pass.remaining_sessions <= 900 && pass.remaining_sessions > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleManualDeduction(pass)}
+                            disabled={deductingSession === pass.id}
+                            className="gap-1"
+                          >
+                            <Minus className="w-3 h-3" />
+                            {deductingSession === pass.id ? "..." : "Déduire"}
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openEditDialog(pass)}
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openDeletePassDialog(pass)}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -554,6 +707,30 @@ const PassManagement = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Pass Confirmation Dialog */}
+      <AlertDialog open={deletePassDialogOpen} onOpenChange={setDeletePassDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer ce laissez-passer ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. Le laissez-passer{" "}
+              <strong>{passToDelete && getPassTypeLabel(passToDelete.pass_type)}</strong>{" "}
+              et tout son historique de déductions seront supprimés.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingPass}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeletePass}
+              disabled={deletingPass}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingPass ? "Suppression..." : "Supprimer"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
@@ -10,9 +10,21 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Users, UserPlus, Shield, User, Mail, Trash2, Ticket, FileText } from "lucide-react";
+import { Users, UserPlus, Shield, User, Mail, Trash2, Ticket, FileText, Search } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -49,6 +61,26 @@ const AdminUsersPage = () => {
   const [newAdminName, setNewAdminName] = useState("");
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [clientToDelete, setClientToDelete] = useState<Profile | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  // Filtered and sorted clients
+  const filteredClients = useMemo(() => {
+    const sorted = [...clients].sort((a, b) => 
+      (a.full_name || "").localeCompare(b.full_name || "", "fr")
+    );
+    
+    if (!searchTerm) return sorted;
+    
+    const term = searchTerm.toLowerCase();
+    return sorted.filter(client => 
+      client.full_name?.toLowerCase().includes(term) ||
+      client.email?.toLowerCase().includes(term) ||
+      client.phone?.toLowerCase().includes(term)
+    );
+  }, [clients, searchTerm]);
 
   useEffect(() => {
     loadData();
@@ -201,6 +233,56 @@ const AdminUsersPage = () => {
     loadData();
   };
 
+  const handleDeleteClient = async () => {
+    if (!clientToDelete) return;
+    
+    setDeleting(true);
+
+    try {
+      // Delete all associated data in parallel
+      await Promise.all([
+        supabase.from("passes").delete().eq("user_id", clientToDelete.user_id),
+        supabase.from("bookings").delete().eq("user_id", clientToDelete.user_id),
+        supabase.from("purchases").delete().eq("user_id", clientToDelete.user_id),
+        supabase.from("session_deductions").delete().eq("user_id", clientToDelete.user_id),
+        supabase.from("client_notes").delete().eq("user_id", clientToDelete.user_id),
+        supabase.from("client_invoices").delete().eq("user_id", clientToDelete.user_id),
+        supabase.from("user_roles").delete().eq("user_id", clientToDelete.user_id),
+      ]);
+
+      // Delete the profile
+      const { error } = await supabase
+        .from("profiles")
+        .delete()
+        .eq("user_id", clientToDelete.user_id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Client supprimé",
+        description: `${clientToDelete.full_name || clientToDelete.email} a été supprimé`,
+      });
+
+      loadData();
+    } catch (err) {
+      console.error("Delete error:", err);
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer le client",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleting(false);
+      setDeleteDialogOpen(false);
+      setClientToDelete(null);
+    }
+  };
+
+  const openDeleteDialog = (client: Profile) => {
+    setClientToDelete(client);
+    setDeleteDialogOpen(true);
+  };
+
   if (loading) {
     return (
       <AdminLayout>
@@ -347,24 +429,43 @@ const AdminUsersPage = () => {
 
           <TabsContent value="clients">
             <div className="dashboard-card">
+              {/* Search Bar */}
+              <div className="mb-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Rechercher par nom, email ou téléphone..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+
               {clients.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
                   <p>Aucun client inscrit</p>
+                </div>
+              ) : filteredClients.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Search className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>Aucun résultat pour "{searchTerm}"</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
                       <tr className="text-left text-muted-foreground text-sm border-b border-border">
-                        <th className="pb-3 font-medium">Nom</th>
+                        <th className="pb-3 font-medium">Nom ▲</th>
                         <th className="pb-3 font-medium">Email</th>
                         <th className="pb-3 font-medium">Téléphone</th>
                         <th className="pb-3 font-medium">Inscrit le</th>
+                        <th className="pb-3 font-medium text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {clients.map((client) => (
+                      {filteredClients.map((client) => (
                         <tr key={client.id} className="border-b border-border/50">
                           <td className="py-3">
                             <div className="flex items-center gap-3">
@@ -386,6 +487,16 @@ const AdminUsersPage = () => {
                           <td className="py-3 text-muted-foreground">
                             {format(new Date(client.created_at), "d MMM yyyy", { locale: fr })}
                           </td>
+                          <td className="py-3 text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => openDeleteDialog(client)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -403,6 +514,35 @@ const AdminUsersPage = () => {
             <ClientNotesInvoices />
           </TabsContent>
         </Tabs>
+
+        {/* Delete Client Confirmation Dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Supprimer ce client ?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Cette action est irréversible. Toutes les données associées à{" "}
+                <strong>{clientToDelete?.full_name || clientToDelete?.email}</strong> seront supprimées :
+                <ul className="list-disc list-inside mt-2 space-y-1">
+                  <li>Laissez-passer</li>
+                  <li>Réservations</li>
+                  <li>Achats</li>
+                  <li>Notes et factures</li>
+                </ul>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting}>Annuler</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteClient}
+                disabled={deleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleting ? "Suppression..." : "Supprimer"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AdminLayout>
   );

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, forwardRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import ClientLayout from "@/components/client/ClientLayout";
@@ -32,7 +32,7 @@ interface Purchase {
   payment_status: string;
 }
 
-const ClientDashboard = () => {
+const ClientDashboard = forwardRef<HTMLDivElement>((_, ref) => {
   const navigate = useNavigate();
   const [upcomingBookings, setUpcomingBookings] = useState<Booking[]>([]);
   const [activePasses, setActivePasses] = useState<Pass[]>([]);
@@ -128,7 +128,7 @@ const ClientDashboard = () => {
 
   return (
     <ClientLayout>
-      <div className="p-6 lg:p-8">
+      <div ref={ref} className="p-6 lg:p-8">
         <div className="mb-8">
           <h1 className="font-display text-3xl lg:text-4xl mb-2">
             Tableau de bord
@@ -363,6 +363,8 @@ const ClientDashboard = () => {
       </div>
     </ClientLayout>
   );
-};
+});
+
+ClientDashboard.displayName = "ClientDashboard";
 
 export default ClientDashboard;

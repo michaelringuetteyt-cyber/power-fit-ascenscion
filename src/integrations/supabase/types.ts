@@ -246,6 +246,48 @@ export type Database = {
         }
         Relationships: []
       }
+      employee_permissions: {
+        Row: {
+          can_manage_bookings: boolean | null
+          can_manage_chat: boolean | null
+          can_manage_content: boolean | null
+          can_manage_users: boolean | null
+          can_view_dashboard: boolean | null
+          can_view_stats: boolean | null
+          created_at: string | null
+          created_by: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          can_manage_bookings?: boolean | null
+          can_manage_chat?: boolean | null
+          can_manage_content?: boolean | null
+          can_manage_users?: boolean | null
+          can_view_dashboard?: boolean | null
+          can_view_stats?: boolean | null
+          created_at?: string | null
+          created_by: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          can_manage_bookings?: boolean | null
+          can_manage_chat?: boolean | null
+          can_manage_content?: boolean | null
+          can_manage_users?: boolean | null
+          can_view_dashboard?: boolean | null
+          can_view_stats?: boolean | null
+          created_at?: string | null
+          created_by?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       passes: {
         Row: {
           created_at: string
@@ -510,6 +552,10 @@ export type Database = {
             }[]
           }
       expire_outdated_passes: { Args: never; Returns: undefined }
+      has_employee_permission: {
+        Args: { p_permission: string; p_user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -518,6 +564,7 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: never; Returns: boolean }
+      is_employee: { Args: never; Returns: boolean }
       refund_session_to_pass: {
         Args: { p_booking_id: string }
         Returns: {

@@ -1,92 +1,62 @@
 
 
-# Amélioration de la gestion des utilisateurs et des passes
+# Amélioration de la section Notes & Factures
 
 ## Objectif
-Améliorer la section "Gestion des utilisateurs" avec :
-1. **Section Clients** : Tri alphabétique, recherche multi-critères (nom, email, téléphone), suppression de clients
-2. **Section Passes** : Suppression complète d'un pass, ou déduction séance par séance
+Ajouter les fonctionnalités suivantes à la section Notes & Factures :
+1. **Recherche de clients** par nom, téléphone et email
+2. **Tri des factures** par date (plus récentes d'abord, plus anciennes d'abord)
+3. **Vue des factures les plus récentes** en priorité
 
 ---
 
-## 1. Améliorations de la section Clients
+## 1. Recherche de clients
 
-### 1.1 Tri alphabétique
-- Les clients seront triés par ordre alphabétique de leur nom (A→Z)
-- Ceux sans nom seront affichés à la fin
+### Fonctionnalités
+- Remplacer le simple sélecteur par une barre de recherche avec filtrage
+- Recherche en temps réel sur :
+  - Nom complet (`full_name`)
+  - Adresse email (`email`)
+  - Numéro de téléphone (nécessite d'ajouter le champ à l'interface Profile)
+- Affichage des résultats filtrés dans un sélecteur déroulant
 
-### 1.2 Barre de recherche
-- Champ de recherche unique permettant de filtrer par :
-  - Nom du client
-  - Adresse email
-  - Numéro de téléphone
-- Recherche en temps réel (filtre instantané pendant la saisie)
-
-### 1.3 Suppression d'un client
-- Bouton de suppression sur chaque ligne client
-- Confirmation requise avant suppression (dialogue de confirmation)
-- La suppression supprimera également :
-  - Les passes associés
-  - Les réservations associées
-  - Les achats associés
-  - Les notes et factures associées
-  - Le rôle utilisateur
-
-### Interface visuelle (Section Clients)
+### Interface visuelle
 ```text
 ┌─────────────────────────────────────────────────────────────┐
-│  🔍 Rechercher par nom, email ou téléphone...               │
+│  🔍 Rechercher un client par nom, email ou téléphone...     │
 ├─────────────────────────────────────────────────────────────┤
-│  Nom ▲        │  Email         │  Téléphone  │  Inscrit │ 🗑 │
-├───────────────┼────────────────┼─────────────┼──────────┼───┤
-│  Alice Martin │  alice@...     │  06...      │  1 jan   │ 🗑 │
-│  Bob Dupont   │  bob@...       │  07...      │  2 jan   │ 🗑 │
-│  Claire Petit │  claire@...    │  —          │  3 jan   │ 🗑 │
+│  ▾ Liste filtrée des clients correspondants                 │
+│    ┌─────────────────────────────────────────────────────┐  │
+│    │ 👤 Marie Dupont - marie@email.com - 514-555-1234    │  │
+│    │ 👤 Marc Dubois - marc@email.com - 438-555-5678      │  │
+│    └─────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 2. Améliorations de la section Passes
+## 2. Tri des factures
 
-### 2.1 Suppression complète d'un pass
-- Nouveau bouton "Supprimer le pass" dans le dialogue d'historique
-- Confirmation requise avec avertissement que l'action est irréversible
-- Supprime le pass et l'historique des déductions associé
+### Options de tri
+- **Plus récentes** : factures triées par `invoice_date` décroissant (par défaut)
+- **Plus anciennes** : factures triées par `invoice_date` croissant
+- **Date d'ajout** : factures triées par `created_at` (date de création dans le système)
 
-### 2.2 Déduction séance par séance
-- Nouveau bouton "Déduire une séance" pour chaque pass actif
-- Permet de déduire manuellement une séance sans réservation
-- Enregistre la déduction dans l'historique avec une note "Déduction manuelle"
-
-### Interface visuelle (Section Passes - Historique)
+### Interface visuelle
 ```text
-┌──────────────────────────────────────────────────────────┐
-│  Historique - Alice Martin                               │
-├──────────────────────────────────────────────────────────┤
-│  🎫 Passes actifs                                        │
-│  ┌────────────────────────────────────────────────────┐  │
-│  │  Carte de 10 cours                                 │  │
-│  │  7 séances restantes                               │  │
-│  │  [➖ Déduire] [✏️ Modifier] [🗑️ Supprimer]        │  │
-│  └────────────────────────────────────────────────────┘  │
-│                                                          │
-│  📜 Historique des achats...                             │
-│  📉 Historique des déductions...                         │
-└──────────────────────────────────────────────────────────┘
-```
-
----
-
-## 3. Migration base de données
-
-Ajouter une politique RLS pour permettre aux admins de supprimer des profils :
-
-```sql
-CREATE POLICY "Admins can delete profiles" 
-ON public.profiles 
-FOR DELETE 
-USING (is_admin());
+┌──────────────────────────────────────────────────────────────┐
+│  📋 Factures du client                       [Trier par ▾]   │
+│                                              ┌─────────────┐ │
+│                                              │ Plus récentes│ │
+│                                              │ Plus anciennes│ │
+│                                              │ Date d'ajout │ │
+│                                              └─────────────┘ │
+├──────────────────────────────────────────────────────────────┤
+│  N° Facture  │  Date       │  Montant  │  Statut  │  Actions │
+├──────────────┼─────────────┼───────────┼──────────┼──────────┤
+│  FAC-001     │  5 fév 2026 │  150.00$  │  Payée   │  📥 ✏️ 🗑 │
+│  FAC-002     │  3 fév 2026 │  200.00$  │  Attente │  📥 ✏️ 🗑 │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -95,100 +65,142 @@ USING (is_admin());
 
 | Fichier | Modifications |
 |---------|---------------|
-| `src/pages/admin/AdminUsersPage.tsx` | Ajouter recherche, tri alphabétique, bouton suppression clients |
-| `src/components/admin/PassManagement.tsx` | Ajouter suppression pass, déduction manuelle séance |
-| **Migration SQL** | Politique RLS pour suppression de profils |
+| `src/components/admin/ClientNotesInvoices.tsx` | Ajouter recherche client + tri factures |
 
 ---
 
 ## Section technique
 
-### Logique de recherche (AdminUsersPage.tsx)
+### Modifications de l'interface Profile
+Ajouter le champ `phone` qui existe déjà dans la table `profiles` :
 
 ```typescript
-const [searchTerm, setSearchTerm] = useState("");
+interface Profile {
+  id: string;
+  user_id: string;
+  full_name: string;
+  email: string;
+  phone: string | null; // Ajouter ce champ
+}
+```
+
+### État pour la recherche
+```typescript
+const [clientSearchTerm, setClientSearchTerm] = useState("");
 
 const filteredClients = useMemo(() => {
-  const sorted = [...clients].sort((a, b) => 
-    (a.full_name || "").localeCompare(b.full_name || "", "fr")
-  );
+  if (!clientSearchTerm.trim()) return clients;
   
-  if (!searchTerm) return sorted;
-  
-  const term = searchTerm.toLowerCase();
-  return sorted.filter(client => 
+  const term = clientSearchTerm.toLowerCase();
+  return clients.filter(client =>
     client.full_name?.toLowerCase().includes(term) ||
     client.email?.toLowerCase().includes(term) ||
     client.phone?.toLowerCase().includes(term)
   );
-}, [clients, searchTerm]);
+}, [clients, clientSearchTerm]);
 ```
 
-### Suppression d'un client
-
+### État pour le tri des factures
 ```typescript
-const handleDeleteClient = async (client: Profile) => {
-  // Supprimer toutes les données associées
-  await Promise.all([
-    supabase.from("passes").delete().eq("user_id", client.user_id),
-    supabase.from("bookings").delete().eq("user_id", client.user_id),
-    supabase.from("purchases").delete().eq("user_id", client.user_id),
-    supabase.from("session_deductions").delete().eq("user_id", client.user_id),
-    supabase.from("client_notes").delete().eq("user_id", client.user_id),
-    supabase.from("client_invoices").delete().eq("user_id", client.user_id),
-    supabase.from("user_roles").delete().eq("user_id", client.user_id),
-  ]);
+type InvoiceSortOption = "recent" | "oldest" | "created";
+const [invoiceSortBy, setInvoiceSortBy] = useState<InvoiceSortOption>("recent");
+
+const sortedInvoices = useMemo(() => {
+  const sorted = [...invoices];
   
-  // Supprimer le profil
-  await supabase.from("profiles").delete().eq("user_id", client.user_id);
+  switch (invoiceSortBy) {
+    case "recent":
+      return sorted.sort((a, b) => 
+        new Date(b.invoice_date).getTime() - new Date(a.invoice_date).getTime()
+      );
+    case "oldest":
+      return sorted.sort((a, b) => 
+        new Date(a.invoice_date).getTime() - new Date(b.invoice_date).getTime()
+      );
+    case "created":
+      return sorted.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+    default:
+      return sorted;
+  }
+}, [invoices, invoiceSortBy]);
+```
+
+### Mise à jour du chargement des clients
+```typescript
+const loadClients = async () => {
+  const { data: adminUsers } = await supabase
+    .from("admin_users")
+    .select("user_id");
+  
+  const adminUserIds = adminUsers?.map(a => a.user_id) || [];
+  
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, user_id, full_name, email, phone") // Ajouter phone
+    .order("full_name");
+  
+  if (profiles) {
+    const clientProfiles = profiles.filter(p => !adminUserIds.includes(p.user_id));
+    setClients(clientProfiles);
+  }
+  setLoading(false);
 };
 ```
 
-### Suppression d'un pass (PassManagement.tsx)
-
+### Composant de recherche client
 ```typescript
-const handleDeletePass = async (pass: Pass) => {
-  // Supprimer les déductions associées
-  await supabase
-    .from("session_deductions")
-    .delete()
-    .eq("pass_id", pass.id);
-  
-  // Supprimer le pass
-  await supabase
-    .from("passes")
-    .delete()
-    .eq("id", pass.id);
-};
+<div className="space-y-2">
+  <Label>Rechercher un client</Label>
+  <div className="relative">
+    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+    <Input
+      placeholder="Rechercher par nom, email ou téléphone..."
+      value={clientSearchTerm}
+      onChange={(e) => setClientSearchTerm(e.target.value)}
+      className="pl-10"
+    />
+  </div>
+</div>
+
+<Select value={selectedClient} onValueChange={setSelectedClient}>
+  <SelectTrigger>
+    <SelectValue placeholder="Choisir un client..." />
+  </SelectTrigger>
+  <SelectContent>
+    {filteredClients.map((client) => (
+      <SelectItem key={client.user_id} value={client.user_id}>
+        <div className="flex flex-col">
+          <span>{client.full_name || "Sans nom"}</span>
+          <span className="text-xs text-muted-foreground">
+            {client.email} {client.phone && `• ${client.phone}`}
+          </span>
+        </div>
+      </SelectItem>
+    ))}
+  </SelectContent>
+</Select>
 ```
 
-### Déduction manuelle d'une séance
-
+### Sélecteur de tri pour les factures
 ```typescript
-const handleManualDeduction = async (pass: Pass) => {
-  if (pass.remaining_sessions <= 0) return;
-  
-  const newRemaining = pass.remaining_sessions - 1;
-  
-  // Mettre à jour le pass
-  await supabase
-    .from("passes")
-    .update({ 
-      remaining_sessions: newRemaining,
-      status: newRemaining === 0 ? "used" : "active"
-    })
-    .eq("id", pass.id);
-  
-  // Enregistrer la déduction
-  await supabase
-    .from("session_deductions")
-    .insert({
-      user_id: pass.user_id,
-      pass_id: pass.id,
-      pass_type: pass.pass_type,
-      remaining_after: newRemaining,
-      notes: "Déduction manuelle par l'administrateur"
-    });
-};
+<div className="flex items-center justify-between mb-4">
+  <h3 className="font-display text-lg">Factures du client</h3>
+  <div className="flex items-center gap-2">
+    <Select value={invoiceSortBy} onValueChange={(v) => setInvoiceSortBy(v as InvoiceSortOption)}>
+      <SelectTrigger className="w-[160px]">
+        <ArrowUpDown className="w-4 h-4 mr-2" />
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="recent">Plus récentes</SelectItem>
+        <SelectItem value="oldest">Plus anciennes</SelectItem>
+        <SelectItem value="created">Date d'ajout</SelectItem>
+      </SelectContent>
+    </Select>
+    {/* Bouton Ajouter une facture existant */}
+  </div>
+</div>
 ```
 

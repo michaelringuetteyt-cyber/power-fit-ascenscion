@@ -34,6 +34,15 @@ interface Pass {
   status: string;
 }
 
+interface EmployeePermissions {
+  can_view_dashboard: boolean;
+  can_view_stats: boolean;
+  can_manage_chat: boolean;
+  can_manage_bookings: boolean;
+  can_manage_content: boolean;
+  can_manage_users: boolean;
+}
+
 interface AdminLayoutProps {
   children: React.ReactNode;
 }
@@ -43,6 +52,8 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   const location = useLocation();
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isEmployee, setIsEmployee] = useState(false);
+  const [employeePermissions, setEmployeePermissions] = useState<EmployeePermissions | null>(null);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -61,6 +72,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
 
       setUser(session.user);
 
+      // Check if admin
       const { data: adminData } = await supabase
         .from("admin_users")
         .select("*")
@@ -72,7 +84,34 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         loadUnreadCount();
         loadProfile(session.user.id);
         loadPasses(session.user.id);
+        setLoading(false);
+        return;
       }
+
+      // Check if employee
+      const { data: employeeData } = await supabase
+        .from("employee_permissions")
+        .select("*")
+        .eq("user_id", session.user.id)
+        .maybeSingle();
+
+      if (employeeData) {
+        setIsEmployee(true);
+        setEmployeePermissions({
+          can_view_dashboard: employeeData.can_view_dashboard,
+          can_view_stats: employeeData.can_view_stats,
+          can_manage_chat: employeeData.can_manage_chat,
+          can_manage_bookings: employeeData.can_manage_bookings,
+          can_manage_content: employeeData.can_manage_content,
+          can_manage_users: employeeData.can_manage_users,
+        });
+        if (employeeData.can_manage_chat) {
+          loadUnreadCount();
+        }
+        loadProfile(session.user.id);
+        loadPasses(session.user.id);
+      }
+
       setLoading(false);
     };
 
@@ -82,6 +121,8 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
       setUser(session?.user ?? null);
       if (!session) {
         setIsAdmin(false);
+        setIsEmployee(false);
+        setEmployeePermissions(null);
       }
     });
 
@@ -114,7 +155,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   };
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!isAdmin && !(isEmployee && employeePermissions?.can_manage_chat)) return;
 
     const channel = supabase
       .channel("admin_unread")
@@ -128,7 +169,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [isAdmin]);
+  }, [isAdmin, isEmployee, employeePermissions]);
 
   const loadUnreadCount = async () => {
     const { count } = await supabase
@@ -143,6 +184,8 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setIsAdmin(false);
+    setIsEmployee(false);
+    setEmployeePermissions(null);
     setUser(null);
     navigate("/");
   };
@@ -169,38 +212,67 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
     }
 
     if (data.user) {
+      // Check if admin first
       const { data: adminData } = await supabase
         .from("admin_users")
         .select("*")
         .eq("user_id", data.user.id)
         .maybeSingle();
 
-      if (!adminData) {
-        // Use atomic function to prevent race condition on first admin creation
-        const { data: isFirstAdmin, error: rpcError } = await supabase
-          .rpc('create_first_admin', {
-            new_user_id: data.user.id,
-            admin_name: email.split("@")[0],
-          });
-
-        if (rpcError) {
-          if (import.meta.env.DEV) console.error("RPC error:", rpcError);
-        }
-
-        if (isFirstAdmin === true) {
-          setIsAdmin(true);
-          loadUnreadCount();
-        } else {
-          toast({
-            title: "Accès refusé",
-            description: "Vous n'êtes pas autorisé à accéder à cette zone.",
-            variant: "destructive",
-          });
-          await supabase.auth.signOut();
-        }
-      } else {
+      if (adminData) {
         setIsAdmin(true);
         loadUnreadCount();
+        loadProfile(data.user.id);
+        loadPasses(data.user.id);
+        return;
+      }
+
+      // Check if employee
+      const { data: employeeData } = await supabase
+        .from("employee_permissions")
+        .select("*")
+        .eq("user_id", data.user.id)
+        .maybeSingle();
+
+      if (employeeData) {
+        setIsEmployee(true);
+        setEmployeePermissions({
+          can_view_dashboard: employeeData.can_view_dashboard,
+          can_view_stats: employeeData.can_view_stats,
+          can_manage_chat: employeeData.can_manage_chat,
+          can_manage_bookings: employeeData.can_manage_bookings,
+          can_manage_content: employeeData.can_manage_content,
+          can_manage_users: employeeData.can_manage_users,
+        });
+        if (employeeData.can_manage_chat) {
+          loadUnreadCount();
+        }
+        loadProfile(data.user.id);
+        loadPasses(data.user.id);
+        return;
+      }
+
+      // Use atomic function to prevent race condition on first admin creation
+      const { data: isFirstAdmin, error: rpcError } = await supabase
+        .rpc('create_first_admin', {
+          new_user_id: data.user.id,
+          admin_name: email.split("@")[0],
+        });
+
+      if (rpcError) {
+        if (import.meta.env.DEV) console.error("RPC error:", rpcError);
+      }
+
+      if (isFirstAdmin === true) {
+        setIsAdmin(true);
+        loadUnreadCount();
+      } else {
+        toast({
+          title: "Accès refusé",
+          description: "Vous n'êtes pas autorisé à accéder à cette zone.",
+          variant: "destructive",
+        });
+        await supabase.auth.signOut();
       }
     }
   };
@@ -234,14 +306,31 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
     }
   };
 
-  const adminNavItems = [
-    { path: "/admin", icon: LayoutDashboard, label: "Dashboard" },
-    { path: "/admin/stats", icon: BarChart3, label: "Statistiques" },
-    { path: "/admin/chat", icon: MessageCircle, label: "Messages", badge: unreadCount },
-    { path: "/admin/bookings", icon: CalendarDays, label: "Réservations" },
-    { path: "/admin/content", icon: Image, label: "Contenu" },
-    { path: "/admin/users", icon: Users, label: "Utilisateurs" },
+  const allAdminNavItems = [
+    { path: "/admin", icon: LayoutDashboard, label: "Dashboard", permission: "dashboard" },
+    { path: "/admin/stats", icon: BarChart3, label: "Statistiques", permission: "stats" },
+    { path: "/admin/chat", icon: MessageCircle, label: "Messages", permission: "chat", badge: unreadCount },
+    { path: "/admin/bookings", icon: CalendarDays, label: "Réservations", permission: "bookings" },
+    { path: "/admin/content", icon: Image, label: "Contenu", permission: "content" },
+    { path: "/admin/users", icon: Users, label: "Utilisateurs", permission: "users" },
   ];
+
+  // Filter nav items based on permissions
+  const adminNavItems = allAdminNavItems.filter(item => {
+    if (isAdmin) return true; // Admin sees everything
+    if (!isEmployee || !employeePermissions) return false;
+    
+    const permissionMap: Record<string, boolean> = {
+      dashboard: employeePermissions.can_view_dashboard,
+      stats: employeePermissions.can_view_stats,
+      chat: employeePermissions.can_manage_chat,
+      bookings: employeePermissions.can_manage_bookings,
+      content: employeePermissions.can_manage_content,
+      users: employeePermissions.can_manage_users,
+    };
+    
+    return permissionMap[item.permission] ?? false;
+  });
 
   const clientNavItems = [
     { path: "/client/profile", icon: UserIcon, label: "Mon profil" },
@@ -258,7 +347,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
     );
   }
 
-  if (!user || !isAdmin) {
+  if (!user || (!isAdmin && !isEmployee)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
         <div className="dashboard-card max-w-md w-full">
@@ -397,6 +486,9 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
                 <p className="text-xs text-muted-foreground truncate">
                   {profile?.email || user.email}
                 </p>
+                {isEmployee && !isAdmin && (
+                  <p className="text-xs text-primary mt-1">Employé</p>
+                )}
               </div>
             </div>
           </div>
@@ -409,7 +501,9 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
 
           {/* Admin Navigation */}
           <div className="p-4">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 px-4">Administration</p>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 px-4">
+              {isAdmin ? "Administration" : "Mon espace"}
+            </p>
             <nav className="space-y-1">
               {adminNavItems.map((item) => (
                 <button

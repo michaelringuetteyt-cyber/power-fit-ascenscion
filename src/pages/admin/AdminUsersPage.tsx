@@ -4,6 +4,7 @@ import AdminLayout from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -24,7 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Users, UserPlus, Shield, User, Mail, Trash2, Ticket, FileText, Search } from "lucide-react";
+import { Users, UserPlus, Shield, User, Mail, Trash2, Ticket, FileText, Search, UserCog, Edit } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -49,12 +50,55 @@ interface Profile {
   created_at: string;
 }
 
+interface Employee {
+  id: string;
+  user_id: string;
+  name: string;
+  can_view_dashboard: boolean;
+  can_view_stats: boolean;
+  can_manage_chat: boolean;
+  can_manage_bookings: boolean;
+  can_manage_content: boolean;
+  can_manage_users: boolean;
+  created_at: string;
+  created_by: string;
+  email?: string;
+}
+
+interface EmployeePermissions {
+  dashboard: boolean;
+  stats: boolean;
+  chat: boolean;
+  bookings: boolean;
+  content: boolean;
+  users: boolean;
+}
+
 const emailSchema = z.string().email("Email invalide");
+
+const defaultPermissions: EmployeePermissions = {
+  dashboard: true,
+  stats: false,
+  chat: false,
+  bookings: false,
+  content: false,
+  users: false,
+};
+
+const permissionLabels: Record<keyof EmployeePermissions, string> = {
+  dashboard: "Tableau de bord",
+  stats: "Statistiques",
+  chat: "Messages",
+  bookings: "Réservations",
+  content: "Contenu",
+  users: "Utilisateurs (clients)",
+};
 
 const AdminUsersPage = () => {
   const { toast } = useToast();
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [clients, setClients] = useState<Profile[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newAdminEmail, setNewAdminEmail] = useState("");
@@ -65,6 +109,17 @@ const AdminUsersPage = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<Profile | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Employee state
+  const [employeeDialogOpen, setEmployeeDialogOpen] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [employeeEmail, setEmployeeEmail] = useState("");
+  const [employeeName, setEmployeeName] = useState("");
+  const [employeePermissions, setEmployeePermissions] = useState<EmployeePermissions>(defaultPermissions);
+  const [employeeError, setEmployeeError] = useState("");
+  const [savingEmployee, setSavingEmployee] = useState(false);
+  const [deleteEmployeeDialogOpen, setDeleteEmployeeDialogOpen] = useState(false);
+  const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
 
   // Filtered and sorted clients
   const filteredClients = useMemo(() => {
@@ -87,9 +142,10 @@ const AdminUsersPage = () => {
   }, []);
 
   const loadData = async () => {
-    const [adminsRes, profilesRes] = await Promise.all([
+    const [adminsRes, profilesRes, employeesRes] = await Promise.all([
       supabase.from("admin_users").select("*").order("created_at", { ascending: false }),
       supabase.from("profiles").select("*").order("created_at", { ascending: false }),
+      supabase.from("employee_permissions").select("*").order("created_at", { ascending: false }),
     ]);
 
     if (adminsRes.data) {
@@ -108,10 +164,27 @@ const AdminUsersPage = () => {
     }
 
     if (profilesRes.data) {
-      // Filter out admins from clients list
+      // Filter out admins and employees from clients list
       const adminUserIds = adminsRes.data?.map(a => a.user_id) || [];
-      const clientProfiles = profilesRes.data.filter(p => !adminUserIds.includes(p.user_id));
+      const employeeUserIds = employeesRes.data?.map(e => e.user_id) || [];
+      const excludedIds = [...adminUserIds, ...employeeUserIds];
+      const clientProfiles = profilesRes.data.filter(p => !excludedIds.includes(p.user_id));
       setClients(clientProfiles);
+    }
+
+    if (employeesRes.data) {
+      // Get emails for employees from profiles
+      const employeesWithEmails = await Promise.all(
+        employeesRes.data.map(async (emp) => {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("email")
+            .eq("user_id", emp.user_id)
+            .maybeSingle();
+          return { ...emp, email: profile?.email };
+        })
+      );
+      setEmployees(employeesWithEmails);
     }
 
     setLoading(false);
@@ -283,6 +356,199 @@ const AdminUsersPage = () => {
     setDeleteDialogOpen(true);
   };
 
+  // Employee handlers
+  const openEmployeeDialog = (employee?: Employee) => {
+    if (employee) {
+      setEditingEmployee(employee);
+      setEmployeeEmail(employee.email || "");
+      setEmployeeName(employee.name);
+      setEmployeePermissions({
+        dashboard: employee.can_view_dashboard,
+        stats: employee.can_view_stats,
+        chat: employee.can_manage_chat,
+        bookings: employee.can_manage_bookings,
+        content: employee.can_manage_content,
+        users: employee.can_manage_users,
+      });
+    } else {
+      setEditingEmployee(null);
+      setEmployeeEmail("");
+      setEmployeeName("");
+      setEmployeePermissions(defaultPermissions);
+    }
+    setEmployeeError("");
+    setEmployeeDialogOpen(true);
+  };
+
+  const handleSaveEmployee = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEmployeeError("");
+
+    if (!editingEmployee) {
+      // Adding new employee
+      const emailResult = emailSchema.safeParse(employeeEmail);
+      if (!emailResult.success) {
+        setEmployeeError("Email invalide");
+        return;
+      }
+    }
+
+    if (!employeeName.trim()) {
+      setEmployeeError("Le nom est requis");
+      return;
+    }
+
+    setSavingEmployee(true);
+
+    try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) throw new Error("Non authentifié");
+
+      if (editingEmployee) {
+        // Update existing employee
+        const { error } = await supabase
+          .from("employee_permissions")
+          .update({
+            name: employeeName.trim(),
+            can_view_dashboard: employeePermissions.dashboard,
+            can_view_stats: employeePermissions.stats,
+            can_manage_chat: employeePermissions.chat,
+            can_manage_bookings: employeePermissions.bookings,
+            can_manage_content: employeePermissions.content,
+            can_manage_users: employeePermissions.users,
+          })
+          .eq("id", editingEmployee.id);
+
+        if (error) throw error;
+
+        toast({
+          title: "Employé modifié",
+          description: `Les permissions de ${employeeName} ont été mises à jour`,
+        });
+      } else {
+        // Find user by email
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("user_id")
+          .eq("email", employeeEmail.toLowerCase())
+          .maybeSingle();
+
+        if (!profile) {
+          setEmployeeError("Aucun utilisateur trouvé avec cet email. L'utilisateur doit d'abord s'inscrire.");
+          setSavingEmployee(false);
+          return;
+        }
+
+        // Check if already admin or employee
+        const [adminCheck, employeeCheck] = await Promise.all([
+          supabase.from("admin_users").select("id").eq("user_id", profile.user_id).maybeSingle(),
+          supabase.from("employee_permissions").select("id").eq("user_id", profile.user_id).maybeSingle(),
+        ]);
+
+        if (adminCheck.data) {
+          setEmployeeError("Cet utilisateur est déjà administrateur");
+          setSavingEmployee(false);
+          return;
+        }
+
+        if (employeeCheck.data) {
+          setEmployeeError("Cet utilisateur est déjà employé");
+          setSavingEmployee(false);
+          return;
+        }
+
+        // Add employee permissions
+        const { error: insertError } = await supabase
+          .from("employee_permissions")
+          .insert({
+            user_id: profile.user_id,
+            name: employeeName.trim(),
+            can_view_dashboard: employeePermissions.dashboard,
+            can_view_stats: employeePermissions.stats,
+            can_manage_chat: employeePermissions.chat,
+            can_manage_bookings: employeePermissions.bookings,
+            can_manage_content: employeePermissions.content,
+            can_manage_users: employeePermissions.users,
+            created_by: currentUser.id,
+          });
+
+        if (insertError) throw insertError;
+
+        // Add employee role
+        await supabase
+          .from("user_roles")
+          .insert({ user_id: profile.user_id, role: "employee" });
+
+        toast({
+          title: "Employé ajouté",
+          description: `${employeeName} est maintenant employé`,
+        });
+      }
+
+      setEmployeeDialogOpen(false);
+      loadData();
+    } catch (err) {
+      console.error("Save employee error:", err);
+      toast({
+        title: "Erreur",
+        description: "Impossible de sauvegarder l'employé",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingEmployee(false);
+    }
+  };
+
+  const handleDeleteEmployee = async () => {
+    if (!employeeToDelete) return;
+
+    setDeleting(true);
+
+    try {
+      // Delete employee permissions
+      await supabase
+        .from("employee_permissions")
+        .delete()
+        .eq("id", employeeToDelete.id);
+
+      // Remove employee role
+      await supabase
+        .from("user_roles")
+        .delete()
+        .eq("user_id", employeeToDelete.user_id)
+        .eq("role", "employee");
+
+      toast({
+        title: "Employé supprimé",
+        description: `${employeeToDelete.name} n'est plus employé`,
+      });
+
+      loadData();
+    } catch (err) {
+      console.error("Delete employee error:", err);
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer l'employé",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleting(false);
+      setDeleteEmployeeDialogOpen(false);
+      setEmployeeToDelete(null);
+    }
+  };
+
+  const getEmployeePermissionsList = (emp: Employee) => {
+    const perms: string[] = [];
+    if (emp.can_view_dashboard) perms.push("Dashboard");
+    if (emp.can_view_stats) perms.push("Statistiques");
+    if (emp.can_manage_chat) perms.push("Messages");
+    if (emp.can_manage_bookings) perms.push("Réservations");
+    if (emp.can_manage_content) perms.push("Contenu");
+    if (emp.can_manage_users) perms.push("Utilisateurs");
+    return perms.length > 0 ? perms.join(", ") : "Aucune";
+  };
+
   if (loading) {
     return (
       <AdminLayout>
@@ -302,7 +568,7 @@ const AdminUsersPage = () => {
               Gestion des utilisateurs
             </h1>
             <p className="text-muted-foreground">
-              Gérez les administrateurs et consultez les clients
+              Gérez les administrateurs, employés et consultez les clients
             </p>
           </div>
 
@@ -375,6 +641,10 @@ const AdminUsersPage = () => {
             <TabsTrigger value="clients" className="gap-2">
               <Users className="w-4 h-4" />
               Clients ({clients.length})
+            </TabsTrigger>
+            <TabsTrigger value="employees" className="gap-2">
+              <UserCog className="w-4 h-4" />
+              Employés ({employees.length})
             </TabsTrigger>
             <TabsTrigger value="passes" className="gap-2">
               <Ticket className="w-4 h-4" />
@@ -506,6 +776,71 @@ const AdminUsersPage = () => {
             </div>
           </TabsContent>
 
+          <TabsContent value="employees">
+            <div className="dashboard-card">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-display text-lg">Employés ({employees.length})</h3>
+                <Button variant="hero" size="sm" onClick={() => openEmployeeDialog()}>
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Ajouter un employé
+                </Button>
+              </div>
+
+              {employees.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <UserCog className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>Aucun employé</p>
+                  <p className="text-sm mt-1">Ajoutez des employés avec des permissions personnalisées</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {employees.map((emp) => (
+                    <div
+                      key={emp.id}
+                      className="flex items-center justify-between p-4 rounded-lg bg-muted/50"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center">
+                          <UserCog className="w-5 h-5 text-accent-foreground" />
+                        </div>
+                        <div>
+                          <p className="font-medium">{emp.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {emp.email || "Email inconnu"} • Ajouté le{" "}
+                            {format(new Date(emp.created_at), "d MMM yyyy", { locale: fr })}
+                          </p>
+                          <p className="text-xs text-primary mt-1">
+                            Permissions: {getEmployeePermissionsList(emp)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openEmployeeDialog(emp)}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => {
+                            setEmployeeToDelete(emp);
+                            setDeleteEmployeeDialogOpen(true);
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
           <TabsContent value="passes">
             <PassManagement />
           </TabsContent>
@@ -543,6 +878,109 @@ const AdminUsersPage = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Delete Employee Confirmation Dialog */}
+        <AlertDialog open={deleteEmployeeDialogOpen} onOpenChange={setDeleteEmployeeDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Supprimer cet employé ?</AlertDialogTitle>
+              <AlertDialogDescription>
+                <strong>{employeeToDelete?.name}</strong> n'aura plus accès au panneau d'administration.
+                Cette action ne supprime pas le compte utilisateur.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting}>Annuler</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteEmployee}
+                disabled={deleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleting ? "Suppression..." : "Supprimer"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Add/Edit Employee Dialog */}
+        <Dialog open={employeeDialogOpen} onOpenChange={setEmployeeDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="font-display text-xl">
+                {editingEmployee ? "Modifier l'employé" : "Ajouter un employé"}
+              </DialogTitle>
+              <DialogDescription>
+                {editingEmployee 
+                  ? "Modifiez les permissions de cet employé" 
+                  : "L'utilisateur doit avoir un compte existant pour être ajouté comme employé."}
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSaveEmployee} className="space-y-4 mt-4">
+              {!editingEmployee && (
+                <div className="space-y-2">
+                  <Label htmlFor="employeeEmail">Email de l'utilisateur</Label>
+                  <Input
+                    id="employeeEmail"
+                    type="email"
+                    value={employeeEmail}
+                    onChange={(e) => {
+                      setEmployeeEmail(e.target.value);
+                      setEmployeeError("");
+                    }}
+                    placeholder="utilisateur@email.com"
+                  />
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="employeeName">Nom affiché</Label>
+                <Input
+                  id="employeeName"
+                  value={employeeName}
+                  onChange={(e) => {
+                    setEmployeeName(e.target.value);
+                    setEmployeeError("");
+                  }}
+                  placeholder="Nom de l'employé"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <Label>Permissions</Label>
+                <div className="space-y-2 p-4 rounded-lg bg-muted/50">
+                  {(Object.keys(permissionLabels) as Array<keyof EmployeePermissions>).map((key) => (
+                    <div key={key} className="flex items-center space-x-3">
+                      <Checkbox
+                        id={`perm-${key}`}
+                        checked={employeePermissions[key]}
+                        onCheckedChange={(checked) => 
+                          setEmployeePermissions(prev => ({ ...prev, [key]: !!checked }))
+                        }
+                      />
+                      <Label htmlFor={`perm-${key}`} className="cursor-pointer font-normal">
+                        {permissionLabels[key]}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {employeeError && <p className="text-sm text-destructive">{employeeError}</p>}
+              
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEmployeeDialogOpen(false)}
+                >
+                  Annuler
+                </Button>
+                <Button type="submit" variant="hero" disabled={savingEmployee}>
+                  {savingEmployee ? "Enregistrement..." : editingEmployee ? "Modifier" : "Ajouter"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
     </AdminLayout>
   );

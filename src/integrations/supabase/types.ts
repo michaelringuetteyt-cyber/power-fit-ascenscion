@@ -518,6 +518,16 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: never; Returns: boolean }
+      refund_session_to_pass: {
+        Args: { p_booking_id: string }
+        Returns: {
+          message: string
+          pass_id: string
+          pass_type: string
+          remaining_sessions: number
+          success: boolean
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "client"

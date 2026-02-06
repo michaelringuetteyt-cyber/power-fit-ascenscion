@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import ClientLayout from "@/components/client/ClientLayout";
@@ -32,7 +32,7 @@ interface Purchase {
   payment_status: string;
 }
 
-const ClientDashboard = () => {
+const ClientDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [upcomingBookings, setUpcomingBookings] = useState<Booking[]>([]);
   const [activePasses, setActivePasses] = useState<Pass[]>([]);

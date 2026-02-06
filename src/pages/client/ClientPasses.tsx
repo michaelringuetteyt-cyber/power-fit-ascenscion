@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import ClientLayout from "@/components/client/ClientLayout";
@@ -20,7 +20,7 @@ interface Pass {
   created_at: string;
 }
 
-const ClientPasses = () => {
+const ClientPasses: React.FC = () => {
   const navigate = useNavigate();
   const [activePasses, setActivePasses] = useState<Pass[]>([]);
   const [inactivePasses, setInactivePasses] = useState<Pass[]>([]);

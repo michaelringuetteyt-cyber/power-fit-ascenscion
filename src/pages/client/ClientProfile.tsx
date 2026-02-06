@@ -1,4 +1,4 @@
-import { useState, useEffect, forwardRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import ClientLayout from "@/components/client/ClientLayout";
@@ -22,7 +22,7 @@ const passwordSchema = z.object({
   path: ["confirmPassword"],
 });
 
-const ClientProfile = forwardRef<HTMLDivElement>((_, ref) => {
+const ClientProfile = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -174,7 +174,7 @@ const ClientProfile = forwardRef<HTMLDivElement>((_, ref) => {
 
   return (
     <ClientLayout>
-      <div ref={ref} className="p-6 lg:p-8">
+      <div className="p-6 lg:p-8">
         <div className="mb-8">
           <h1 className="font-display text-3xl lg:text-4xl mb-2">Mon profil</h1>
           <p className="text-muted-foreground">
@@ -328,8 +328,6 @@ const ClientProfile = forwardRef<HTMLDivElement>((_, ref) => {
       </div>
     </ClientLayout>
   );
-});
-
-ClientProfile.displayName = "ClientProfile";
+};
 
 export default ClientProfile;

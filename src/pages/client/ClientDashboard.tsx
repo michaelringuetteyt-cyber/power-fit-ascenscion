@@ -222,7 +222,7 @@ const ClientDashboard = () => {
                   variant="outline"
                   size="sm"
                   className="mt-4"
-                  onClick={() => navigate("/#booking")}
+                  onClick={() => navigate("/client/bookings/new")}
                 >
                   Réserver une séance
                 </Button>

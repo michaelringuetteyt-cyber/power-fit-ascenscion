@@ -13,6 +13,7 @@ import AdminUsersPage from "./pages/admin/AdminUsersPage";
 import ClientDashboard from "./pages/client/ClientDashboard";
 import ClientProfile from "./pages/client/ClientProfile";
 import ClientBookings from "./pages/client/ClientBookings";
+import ClientNewBooking from "./pages/client/ClientNewBooking";
 import ClientPasses from "./pages/client/ClientPasses";
 import ClientPurchases from "./pages/client/ClientPurchases";
 import NotFound from "./pages/NotFound";
@@ -32,6 +33,7 @@ const App = () => (
           <Route path="/client" element={<ClientDashboard />} />
           <Route path="/client/profile" element={<ClientProfile />} />
           <Route path="/client/bookings" element={<ClientBookings />} />
+          <Route path="/client/bookings/new" element={<ClientNewBooking />} />
           <Route path="/client/passes" element={<ClientPasses />} />
           <Route path="/client/purchases" element={<ClientPurchases />} />
           {/* Admin routes */}

@@ -103,7 +103,7 @@ const ClientBookings = () => {
     <div className="text-center py-12 text-muted-foreground">
       <CalendarDays className="w-16 h-16 mx-auto mb-4 opacity-50" />
       <p className="text-lg mb-4">{message}</p>
-      <Button variant="hero" onClick={() => navigate("/#booking")}>
+      <Button variant="hero" onClick={() => navigate("/client/bookings/new")}>
         Réserver une séance
       </Button>
     </div>

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import { useState, useRef } from "react";
 import { MapPin, Users, Sparkles, Maximize2, X, Download } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ interface TrialPassCardProps {
   remainingSessions: number;
 }
 
-const TrialPassCard: React.FC<TrialPassCardProps> = ({ clientName, status, remainingSessions }) => {
+function TrialPassCard({ clientName, status, remainingSessions }: TrialPassCardProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const passRef = useRef<HTMLDivElement>(null);

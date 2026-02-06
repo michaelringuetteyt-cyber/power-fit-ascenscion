@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import ClientLayout from "@/components/client/ClientLayout";
@@ -22,7 +22,7 @@ const passwordSchema = z.object({
   path: ["confirmPassword"],
 });
 
-const ClientProfile: React.FC = () => {
+function ClientProfile() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -328,6 +328,6 @@ const ClientProfile: React.FC = () => {
       </div>
     </ClientLayout>
   );
-};
+}
 
 export default ClientProfile;

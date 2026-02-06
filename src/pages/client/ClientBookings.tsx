@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import ClientLayout from "@/components/client/ClientLayout";
@@ -17,7 +17,7 @@ interface Booking {
   created_at: string;
 }
 
-const ClientBookings: React.FC = () => {
+function ClientBookings() {
   const navigate = useNavigate();
   const [upcomingBookings, setUpcomingBookings] = useState<Booking[]>([]);
   const [pastBookings, setPastBookings] = useState<Booking[]>([]);
@@ -164,6 +164,6 @@ const ClientBookings: React.FC = () => {
       </div>
     </ClientLayout>
   );
-};
+}
 
 export default ClientBookings;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import ClientLayout from "@/components/client/ClientLayout";
@@ -15,7 +15,7 @@ interface Purchase {
   pass_id: string | null;
 }
 
-const ClientPurchases: React.FC = () => {
+function ClientPurchases() {
   const navigate = useNavigate();
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [loading, setLoading] = useState(true);
@@ -140,6 +140,6 @@ const ClientPurchases: React.FC = () => {
       </div>
     </ClientLayout>
   );
-};
+}
 
 export default ClientPurchases;

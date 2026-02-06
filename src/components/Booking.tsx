@@ -315,7 +315,23 @@ const Booking = () => {
         // Will show login prompt, don't advance step
         return;
       }
-      // User is logged in, check eligibility
+      
+      // Check if user already has an active trial pass with remaining sessions
+      const existingTrialPass = activePasses.find(p => p.pass_type === "trial" && p.remaining_sessions > 0);
+      if (existingTrialPass) {
+        // User already has a trial pass with sessions - let them use it
+        setSelectedPass(existingTrialPass);
+        setTrialEligibility({
+          checked: true,
+          eligible: true,
+          passId: existingTrialPass.id,
+          checking: false,
+        });
+        setStep(2);
+        return;
+      }
+      
+      // User doesn't have an active trial pass, check eligibility for new one
       if (userId) {
         checkTrialEligibility(userId);
       }
@@ -327,15 +343,14 @@ const Booking = () => {
       if (!isLoggedIn) {
         return;
       }
-      // Check if user has active passes (non-trial)
-      const nonTrialPasses = activePasses.filter(p => p.pass_type !== "trial");
-      if (nonTrialPasses.length === 0) {
+      // Check if user has active passes (including trial)
+      if (activePasses.length === 0) {
         // No passes available - will show message
         return;
       }
       // If only one pass, auto-select it
-      if (nonTrialPasses.length === 1) {
-        setSelectedPass(nonTrialPasses[0]);
+      if (activePasses.length === 1) {
+        setSelectedPass(activePasses[0]);
       }
       setStep(2);
       return;
@@ -617,9 +632,10 @@ const Booking = () => {
                       <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
                         {appointmentTypes.map((type) => {
                           const isSessionType = type.id === "session";
-                          const nonTrialPasses = activePasses.filter(p => p.pass_type !== "trial");
-                          const hasValidPass = isSessionType && isLoggedIn && nonTrialPasses.length > 0;
-                          const isDisabled = isSessionType && isLoggedIn && nonTrialPasses.length === 0;
+                          const isTrialType = type.id === "trial";
+                          const trialPass = activePasses.find(p => p.pass_type === "trial" && p.remaining_sessions > 0);
+                          const hasValidPass = isSessionType && isLoggedIn && activePasses.length > 0;
+                          const isDisabled = isSessionType && isLoggedIn && activePasses.length === 0;
                           
                           return (
                             <button
@@ -637,12 +653,17 @@ const Booking = () => {
                               {!type.showCalendar && (
                                 <span className="block text-xs text-muted-foreground mt-2">Remplir le formulaire →</span>
                               )}
-                              {isSessionType && hasValidPass && (
+                              {isTrialType && trialPass && (
                                 <span className="block text-xs text-primary mt-2">
-                                  {nonTrialPasses.reduce((sum, p) => sum + p.remaining_sessions, 0)} séance(s) disponible(s)
+                                  {trialPass.remaining_sessions} séance(s) d'essai disponible(s)
                                 </span>
                               )}
-                              {isSessionType && isLoggedIn && nonTrialPasses.length === 0 && (
+                              {isSessionType && hasValidPass && (
+                                <span className="block text-xs text-primary mt-2">
+                                  {activePasses.reduce((sum, p) => sum + p.remaining_sessions, 0)} séance(s) disponible(s)
+                                </span>
+                              )}
+                              {isSessionType && isLoggedIn && activePasses.length === 0 && (
                                 <span className="block text-xs text-muted-foreground mt-2">Aucun pass actif</span>
                               )}
                             </button>
@@ -712,7 +733,7 @@ const Booking = () => {
                       )}
 
                       {/* Session no pass message */}
-                      {formData.type === "session" && activePasses.filter(p => p.pass_type !== "trial").length === 0 && (
+                      {formData.type === "session" && activePasses.length === 0 && (
                         <div className="p-6 rounded-xl bg-secondary/10 border border-secondary/30">
                           <div className="flex items-start gap-4">
                             <div className="w-12 h-12 rounded-xl bg-secondary/20 flex items-center justify-center flex-shrink-0">

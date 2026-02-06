@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect, ReactNode } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -16,10 +16,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface ClientLayoutProps {
-  children: React.ReactNode;
-}
-
 interface Profile {
   full_name: string;
   email: string;
@@ -31,7 +27,7 @@ interface Pass {
   status: string;
 }
 
-const ClientLayout: React.FC<ClientLayoutProps> = ({ children }) => {
+function ClientLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -238,6 +234,6 @@ const ClientLayout: React.FC<ClientLayoutProps> = ({ children }) => {
       </main>
     </div>
   );
-};
+}
 
 export default ClientLayout;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import ClientLayout from "@/components/client/ClientLayout";
@@ -27,7 +27,7 @@ interface ActivePass {
   total_sessions: number;
 }
 
-const ClientNewBooking: React.FC = () => {
+function ClientNewBooking() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -467,9 +467,8 @@ const ClientNewBooking: React.FC = () => {
               <div className="flex justify-end">
                 <Button
                   variant="hero"
-                  size="lg"
-                  disabled={!selectedDate || !selectedTime || !selectedPass}
                   onClick={() => setStep(2)}
+                  disabled={!selectedDate || !selectedTime || !selectedPass}
                 >
                   Continuer
                 </Button>
@@ -477,31 +476,43 @@ const ClientNewBooking: React.FC = () => {
             </div>
           )}
 
-          {/* Step 2: Confirm */}
+          {/* Step 2: Confirmation */}
           {step === 2 && (
             <div className="space-y-6">
               <div className="dashboard-card">
-                <h3 className="font-display text-xl mb-6">Confirmer votre réservation</h3>
-
+                <h3 className="font-display text-xl mb-6">Récapitulatif de votre réservation</h3>
+                
                 <div className="space-y-4">
-                  <div className="flex justify-between py-3 border-b border-border">
-                    <span className="text-muted-foreground">Date</span>
-                    <span className="font-medium capitalize">{formatSelectedDate()}</span>
-                  </div>
-                  <div className="flex justify-between py-3 border-b border-border">
-                    <span className="text-muted-foreground">Heure</span>
-                    <span className="font-medium">{selectedTime}</span>
-                  </div>
-                  <div className="flex justify-between py-3 border-b border-border">
-                    <span className="text-muted-foreground">Laissez-passer</span>
+                  <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
+                    <div className="flex items-center gap-3">
+                      <Ticket className="w-5 h-5 text-primary" />
+                      <span className="text-muted-foreground">Laissez-passer</span>
+                    </div>
                     <span className="font-medium">{selectedPass && getPassTypeLabel(selectedPass.pass_type)}</span>
                   </div>
-                  <div className="flex justify-between py-3">
-                    <span className="text-muted-foreground">Séances après réservation</span>
-                    <span className="font-medium text-primary">
-                      {selectedPass && selectedPass.remaining_sessions - 1} séance(s)
-                    </span>
+                  
+                  <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
+                    <div className="flex items-center gap-3">
+                      <Calendar className="w-5 h-5 text-primary" />
+                      <span className="text-muted-foreground">Date</span>
+                    </div>
+                    <span className="font-medium capitalize">{formatSelectedDate()}</span>
                   </div>
+                  
+                  <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
+                    <div className="flex items-center gap-3">
+                      <Clock className="w-5 h-5 text-primary" />
+                      <span className="text-muted-foreground">Heure</span>
+                    </div>
+                    <span className="font-medium">{selectedTime}</span>
+                  </div>
+                </div>
+
+                <div className="mt-6 p-4 rounded-lg bg-secondary/10 border border-secondary/20">
+                  <p className="text-sm text-muted-foreground">
+                    Une séance sera déduite de votre laissez-passer après confirmation.
+                    Il vous restera {selectedPass ? selectedPass.remaining_sessions - 1 : 0} séance(s).
+                  </p>
                 </div>
               </div>
 
@@ -515,7 +526,7 @@ const ClientNewBooking: React.FC = () => {
                   onClick={handleSubmit}
                   disabled={submitting}
                 >
-                  {submitting ? "Réservation en cours..." : "Confirmer la réservation"}
+                  {submitting ? "Confirmation..." : "Confirmer la réservation"}
                 </Button>
               </div>
             </div>
@@ -523,16 +534,13 @@ const ClientNewBooking: React.FC = () => {
 
           {/* Step 3: Success */}
           {step === 3 && (
-            <div className="text-center py-12">
+            <div className="dashboard-card text-center py-12">
               <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-6">
                 <Check className="w-10 h-10 text-green-500" />
               </div>
-              <h2 className="font-display text-3xl mb-4">Réservation confirmée !</h2>
-              <p className="text-muted-foreground mb-2">
-                Votre séance est réservée pour le
-              </p>
-              <p className="text-xl font-medium capitalize mb-6">
-                {formatSelectedDate()} à {selectedTime}
+              <h2 className="font-display text-2xl mb-2">Réservation confirmée !</h2>
+              <p className="text-muted-foreground mb-6">
+                Votre séance du {formatSelectedDate()} à {selectedTime} est confirmée.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Button variant="hero" onClick={() => navigate("/client/bookings")}>
@@ -548,6 +556,6 @@ const ClientNewBooking: React.FC = () => {
       </div>
     </ClientLayout>
   );
-};
+}
 
 export default ClientNewBooking;

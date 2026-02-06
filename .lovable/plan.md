@@ -1,206 +1,318 @@
 
 
-# Amélioration de la section Notes & Factures
+# Section Employes avec Permissions Personnalisees
 
 ## Objectif
-Ajouter les fonctionnalités suivantes à la section Notes & Factures :
-1. **Recherche de clients** par nom, téléphone et email
-2. **Tri des factures** par date (plus récentes d'abord, plus anciennes d'abord)
-3. **Vue des factures les plus récentes** en priorité
+Ajouter une section "Employes" dans la gestion des utilisateurs, permettant a l'administrateur de creer des employes avec des permissions personnalisees pour chaque section du panneau admin.
 
 ---
 
-## 1. Recherche de clients
+## 1. Concept des permissions
 
-### Fonctionnalités
-- Remplacer le simple sélecteur par une barre de recherche avec filtrage
-- Recherche en temps réel sur :
-  - Nom complet (`full_name`)
-  - Adresse email (`email`)
-  - Numéro de téléphone (nécessite d'ajouter le champ à l'interface Profile)
-- Affichage des résultats filtrés dans un sélecteur déroulant
+### Sections du panneau admin disponibles
+Chaque employe pourra avoir acces a une ou plusieurs de ces sections :
 
-### Interface visuelle
+| Permission | Description |
+|------------|-------------|
+| `dashboard` | Voir le tableau de bord principal |
+| `stats` | Voir les statistiques et graphiques |
+| `chat` | Gerer les messages clients |
+| `bookings` | Gerer les reservations |
+| `content` | Modifier le contenu du site |
+| `users` | Gerer les utilisateurs (clients uniquement, pas les employes) |
+
+### Difference entre Admin et Employe
+- **Admin** : Acces complet a toutes les sections + gestion des employes
+- **Employe** : Acces limite aux sections cochees par l'admin
+
+---
+
+## 2. Interface utilisateur
+
+### Nouvel onglet "Employes" dans la page Utilisateurs
+
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│  🔍 Rechercher un client par nom, email ou téléphone...     │
-├─────────────────────────────────────────────────────────────┤
-│  ▾ Liste filtrée des clients correspondants                 │
-│    ┌─────────────────────────────────────────────────────┐  │
-│    │ 👤 Marie Dupont - marie@email.com - 514-555-1234    │  │
-│    │ 👤 Marc Dubois - marc@email.com - 438-555-5678      │  │
-│    └─────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
+[Administrateurs] [Clients] [Employes] [Passes] [Notes & Factures]
+```
+
+### Liste des employes
+
+```text
++------------------------------------------------------------------+
+|  Employes (3)                           [+ Ajouter un employe]   |
++------------------------------------------------------------------+
+| Jean Dupont                                                      |
+| jean@email.com - Ajoute le 5 fev 2026                            |
+| Permissions: Dashboard, Messages, Reservations                   |
+|                                          [Modifier] [Supprimer]  |
++------------------------------------------------------------------+
+| Marie Martin                                                     |
+| marie@email.com - Ajoute le 3 fev 2026                           |
+| Permissions: Statistiques, Contenu                               |
+|                                          [Modifier] [Supprimer]  |
++------------------------------------------------------------------+
+```
+
+### Dialogue d'ajout/modification d'un employe
+
+```text
++------------------------------------------+
+|  Ajouter un employe                      |
++------------------------------------------+
+|  Email: [_____________________]          |
+|  Nom:   [_____________________]          |
+|                                          |
+|  Permissions:                            |
+|  [x] Dashboard                           |
+|  [x] Statistiques                        |
+|  [x] Messages                            |
+|  [ ] Reservations                        |
+|  [ ] Contenu                             |
+|  [ ] Utilisateurs (clients)              |
+|                                          |
+|           [Annuler] [Ajouter]            |
++------------------------------------------+
 ```
 
 ---
 
-## 2. Tri des factures
+## 3. Migration base de donnees
 
-### Options de tri
-- **Plus récentes** : factures triées par `invoice_date` décroissant (par défaut)
-- **Plus anciennes** : factures triées par `invoice_date` croissant
-- **Date d'ajout** : factures triées par `created_at` (date de création dans le système)
+### Nouvelle table `employee_permissions`
 
-### Interface visuelle
-```text
-┌──────────────────────────────────────────────────────────────┐
-│  📋 Factures du client                       [Trier par ▾]   │
-│                                              ┌─────────────┐ │
-│                                              │ Plus récentes│ │
-│                                              │ Plus anciennes│ │
-│                                              │ Date d'ajout │ │
-│                                              └─────────────┘ │
-├──────────────────────────────────────────────────────────────┤
-│  N° Facture  │  Date       │  Montant  │  Statut  │  Actions │
-├──────────────┼─────────────┼───────────┼──────────┼──────────┤
-│  FAC-001     │  5 fév 2026 │  150.00$  │  Payée   │  📥 ✏️ 🗑 │
-│  FAC-002     │  3 fév 2026 │  200.00$  │  Attente │  📥 ✏️ 🗑 │
-└──────────────────────────────────────────────────────────────┘
+```sql
+CREATE TABLE public.employee_permissions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL UNIQUE,
+  name text NOT NULL,
+  can_view_dashboard boolean DEFAULT false,
+  can_view_stats boolean DEFAULT false,
+  can_manage_chat boolean DEFAULT false,
+  can_manage_bookings boolean DEFAULT false,
+  can_manage_content boolean DEFAULT false,
+  can_manage_users boolean DEFAULT false,
+  created_at timestamp with time zone DEFAULT now(),
+  created_by uuid NOT NULL
+);
+```
+
+### Ajouter le role "employee" a l'enum
+
+```sql
+ALTER TYPE public.app_role ADD VALUE 'employee';
+```
+
+### Politiques RLS
+
+```sql
+-- Seuls les admins peuvent voir/gerer les employes
+CREATE POLICY "Admins can view employees" 
+ON employee_permissions FOR SELECT USING (is_admin());
+
+CREATE POLICY "Admins can insert employees" 
+ON employee_permissions FOR INSERT WITH CHECK (is_admin());
+
+CREATE POLICY "Admins can update employees" 
+ON employee_permissions FOR UPDATE USING (is_admin());
+
+CREATE POLICY "Admins can delete employees" 
+ON employee_permissions FOR DELETE USING (is_admin());
+
+-- Les employes peuvent voir leurs propres permissions
+CREATE POLICY "Employees can view own permissions" 
+ON employee_permissions FOR SELECT USING (user_id = auth.uid());
+```
+
+### Fonction pour verifier les permissions
+
+```sql
+CREATE OR REPLACE FUNCTION public.has_employee_permission(
+  p_user_id uuid, 
+  p_permission text
+)
+RETURNS boolean
+LANGUAGE sql
+STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT CASE p_permission
+    WHEN 'dashboard' THEN can_view_dashboard
+    WHEN 'stats' THEN can_view_stats
+    WHEN 'chat' THEN can_manage_chat
+    WHEN 'bookings' THEN can_manage_bookings
+    WHEN 'content' THEN can_manage_content
+    WHEN 'users' THEN can_manage_users
+    ELSE false
+  END
+  FROM employee_permissions
+  WHERE user_id = p_user_id;
+$$;
 ```
 
 ---
 
-## Fichiers à modifier
+## 4. Fichiers a modifier
 
 | Fichier | Modifications |
 |---------|---------------|
-| `src/components/admin/ClientNotesInvoices.tsx` | Ajouter recherche client + tri factures |
+| `src/pages/admin/AdminUsersPage.tsx` | Ajouter onglet "Employes" avec liste, ajout, modification, suppression |
+| `src/components/admin/AdminLayout.tsx` | Verifier les permissions pour afficher/masquer les liens de navigation |
+| **Migration SQL** | Nouvelle table `employee_permissions` + enum + RLS + fonction |
 
 ---
 
-## Section technique
+## 5. Logique de controle d'acces
 
-### Modifications de l'interface Profile
-Ajouter le champ `phone` qui existe déjà dans la table `profiles` :
+### Verification dans AdminLayout
+
+L'administrateur et les employes auront acces au panneau, mais les employes ne verront que les sections pour lesquelles ils ont la permission.
 
 ```typescript
-interface Profile {
+// Charger les permissions de l'employe
+const [employeePermissions, setEmployeePermissions] = useState(null);
+
+useEffect(() => {
+  const loadPermissions = async () => {
+    if (user && !isAdmin) {
+      const { data } = await supabase
+        .from("employee_permissions")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      
+      if (data) {
+        setEmployeePermissions(data);
+      }
+    }
+  };
+  loadPermissions();
+}, [user, isAdmin]);
+
+// Filtrer les liens de navigation selon les permissions
+const filteredAdminNavItems = adminNavItems.filter(item => {
+  if (isAdmin) return true; // Admin voit tout
+  if (!employeePermissions) return false;
+  
+  const permissionMap = {
+    "/admin": employeePermissions.can_view_dashboard,
+    "/admin/stats": employeePermissions.can_view_stats,
+    "/admin/chat": employeePermissions.can_manage_chat,
+    "/admin/bookings": employeePermissions.can_manage_bookings,
+    "/admin/content": employeePermissions.can_manage_content,
+    "/admin/users": employeePermissions.can_manage_users,
+  };
+  
+  return permissionMap[item.path] ?? false;
+});
+```
+
+### Interface Employee
+
+```typescript
+interface Employee {
   id: string;
   user_id: string;
-  full_name: string;
-  email: string;
-  phone: string | null; // Ajouter ce champ
+  name: string;
+  can_view_dashboard: boolean;
+  can_view_stats: boolean;
+  can_manage_chat: boolean;
+  can_manage_bookings: boolean;
+  can_manage_content: boolean;
+  can_manage_users: boolean;
+  created_at: string;
+  created_by: string;
+  email?: string;
 }
 ```
 
-### État pour la recherche
+### Ajout d'un employe
+
 ```typescript
-const [clientSearchTerm, setClientSearchTerm] = useState("");
-
-const filteredClients = useMemo(() => {
-  if (!clientSearchTerm.trim()) return clients;
-  
-  const term = clientSearchTerm.toLowerCase();
-  return clients.filter(client =>
-    client.full_name?.toLowerCase().includes(term) ||
-    client.email?.toLowerCase().includes(term) ||
-    client.phone?.toLowerCase().includes(term)
-  );
-}, [clients, clientSearchTerm]);
-```
-
-### État pour le tri des factures
-```typescript
-type InvoiceSortOption = "recent" | "oldest" | "created";
-const [invoiceSortBy, setInvoiceSortBy] = useState<InvoiceSortOption>("recent");
-
-const sortedInvoices = useMemo(() => {
-  const sorted = [...invoices];
-  
-  switch (invoiceSortBy) {
-    case "recent":
-      return sorted.sort((a, b) => 
-        new Date(b.invoice_date).getTime() - new Date(a.invoice_date).getTime()
-      );
-    case "oldest":
-      return sorted.sort((a, b) => 
-        new Date(a.invoice_date).getTime() - new Date(b.invoice_date).getTime()
-      );
-    case "created":
-      return sorted.sort((a, b) => 
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
-    default:
-      return sorted;
-  }
-}, [invoices, invoiceSortBy]);
-```
-
-### Mise à jour du chargement des clients
-```typescript
-const loadClients = async () => {
-  const { data: adminUsers } = await supabase
-    .from("admin_users")
-    .select("user_id");
-  
-  const adminUserIds = adminUsers?.map(a => a.user_id) || [];
-  
-  const { data: profiles } = await supabase
+const handleAddEmployee = async () => {
+  // 1. Verifier que l'utilisateur existe
+  const { data: profile } = await supabase
     .from("profiles")
-    .select("id, user_id, full_name, email, phone") // Ajouter phone
-    .order("full_name");
+    .select("user_id")
+    .eq("email", email)
+    .maybeSingle();
   
-  if (profiles) {
-    const clientProfiles = profiles.filter(p => !adminUserIds.includes(p.user_id));
-    setClients(clientProfiles);
+  if (!profile) {
+    setError("Utilisateur non trouve");
+    return;
   }
-  setLoading(false);
+  
+  // 2. Ajouter les permissions
+  await supabase.from("employee_permissions").insert({
+    user_id: profile.user_id,
+    name: name,
+    can_view_dashboard: permissions.dashboard,
+    can_view_stats: permissions.stats,
+    can_manage_chat: permissions.chat,
+    can_manage_bookings: permissions.bookings,
+    can_manage_content: permissions.content,
+    can_manage_users: permissions.users,
+    created_by: currentUser.id,
+  });
+  
+  // 3. Ajouter le role employee
+  await supabase.from("user_roles").insert({
+    user_id: profile.user_id,
+    role: "employee",
+  });
 };
 ```
 
-### Composant de recherche client
-```typescript
-<div className="space-y-2">
-  <Label>Rechercher un client</Label>
-  <div className="relative">
-    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-    <Input
-      placeholder="Rechercher par nom, email ou téléphone..."
-      value={clientSearchTerm}
-      onChange={(e) => setClientSearchTerm(e.target.value)}
-      className="pl-10"
-    />
-  </div>
-</div>
+### Modification des permissions
 
-<Select value={selectedClient} onValueChange={setSelectedClient}>
-  <SelectTrigger>
-    <SelectValue placeholder="Choisir un client..." />
-  </SelectTrigger>
-  <SelectContent>
-    {filteredClients.map((client) => (
-      <SelectItem key={client.user_id} value={client.user_id}>
-        <div className="flex flex-col">
-          <span>{client.full_name || "Sans nom"}</span>
-          <span className="text-xs text-muted-foreground">
-            {client.email} {client.phone && `• ${client.phone}`}
-          </span>
-        </div>
-      </SelectItem>
-    ))}
-  </SelectContent>
-</Select>
+```typescript
+const handleUpdateEmployee = async (employee: Employee) => {
+  await supabase
+    .from("employee_permissions")
+    .update({
+      name: employee.name,
+      can_view_dashboard: employee.can_view_dashboard,
+      can_view_stats: employee.can_view_stats,
+      can_manage_chat: employee.can_manage_chat,
+      can_manage_bookings: employee.can_manage_bookings,
+      can_manage_content: employee.can_manage_content,
+      can_manage_users: employee.can_manage_users,
+    })
+    .eq("id", employee.id);
+};
 ```
 
-### Sélecteur de tri pour les factures
+---
+
+## 6. Securite
+
+### Points importants
+1. **Seuls les administrateurs** peuvent ajouter/modifier/supprimer des employes
+2. Les employes ne peuvent **pas** se donner plus de permissions
+3. Les employes ne peuvent **pas** gerer d'autres employes (meme avec la permission "users")
+4. Chaque page admin doit verifier les permissions cote serveur via RLS
+
+### Protection des pages
+
+Chaque page admin devra egalement verifier si l'utilisateur a la permission requise :
+
 ```typescript
-<div className="flex items-center justify-between mb-4">
-  <h3 className="font-display text-lg">Factures du client</h3>
-  <div className="flex items-center gap-2">
-    <Select value={invoiceSortBy} onValueChange={(v) => setInvoiceSortBy(v as InvoiceSortOption)}>
-      <SelectTrigger className="w-[160px]">
-        <ArrowUpDown className="w-4 h-4 mr-2" />
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="recent">Plus récentes</SelectItem>
-        <SelectItem value="oldest">Plus anciennes</SelectItem>
-        <SelectItem value="created">Date d'ajout</SelectItem>
-      </SelectContent>
-    </Select>
-    {/* Bouton Ajouter une facture existant */}
-  </div>
-</div>
+// Dans chaque page admin (ex: AdminChatPage)
+useEffect(() => {
+  const checkAccess = async () => {
+    const isAdminUser = await checkIsAdmin();
+    if (isAdminUser) return; // Admin a acces
+    
+    const { data: perms } = await supabase
+      .from("employee_permissions")
+      .select("can_manage_chat")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    
+    if (!perms?.can_manage_chat) {
+      navigate("/admin"); // Rediriger si pas de permission
+    }
+  };
+  checkAccess();
+}, []);
 ```
 

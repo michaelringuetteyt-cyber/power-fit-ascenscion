@@ -107,8 +107,8 @@ const AdminUsersPage = () => {
   const [clients, setClients] = useState<Profile[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [newAdminEmail, setNewAdminEmail] = useState("");
+const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedAdminClientId, setSelectedAdminClientId] = useState<string>("");
   const [newAdminName, setNewAdminName] = useState("");
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState("");
@@ -214,9 +214,8 @@ const AdminUsersPage = () => {
     e.preventDefault();
     setError("");
 
-    const emailResult = emailSchema.safeParse(newAdminEmail);
-    if (!emailResult.success) {
-      setError("Email invalide");
+    if (!selectedAdminClientId) {
+      setError("Veuillez sélectionner un client");
       return;
     }
 
@@ -227,24 +226,11 @@ const AdminUsersPage = () => {
 
     setAdding(true);
 
-    // Find the user by email in profiles
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("user_id")
-      .eq("email", newAdminEmail.toLowerCase())
-      .maybeSingle();
-
-    if (!profile) {
-      setAdding(false);
-      setError("Aucun utilisateur trouvé avec cet email. L'utilisateur doit d'abord s'inscrire.");
-      return;
-    }
-
-    // Check if already admin
+    // Check if already admin (double check)
     const { data: existingAdmin } = await supabase
       .from("admin_users")
       .select("id")
-      .eq("user_id", profile.user_id)
+      .eq("user_id", selectedAdminClientId)
       .maybeSingle();
 
     if (existingAdmin) {
@@ -256,7 +242,7 @@ const AdminUsersPage = () => {
     // Add to admin_users
     const { error: insertError } = await supabase
       .from("admin_users")
-      .insert({ user_id: profile.user_id, name: newAdminName.trim() });
+      .insert({ user_id: selectedAdminClientId, name: newAdminName.trim() });
 
     if (insertError) {
       setAdding(false);
@@ -271,11 +257,11 @@ const AdminUsersPage = () => {
     // Add admin role
     await supabase
       .from("user_roles")
-      .insert({ user_id: profile.user_id, role: "admin" });
+      .insert({ user_id: selectedAdminClientId, role: "admin" });
 
     setAdding(false);
     setDialogOpen(false);
-    setNewAdminEmail("");
+    setSelectedAdminClientId("");
     setNewAdminName("");
     
     toast({
@@ -593,17 +579,29 @@ const AdminUsersPage = () => {
               </DialogHeader>
               <form onSubmit={handleAddAdmin} className="space-y-4 mt-4">
                 <div className="space-y-2">
-                  <Label htmlFor="adminEmail">Email de l'utilisateur</Label>
-                  <Input
-                    id="adminEmail"
-                    type="email"
-                    value={newAdminEmail}
-                    onChange={(e) => {
-                      setNewAdminEmail(e.target.value);
+                  <Label htmlFor="clientSelect">Sélectionner un client</Label>
+                  <Select
+                    value={selectedAdminClientId}
+                    onValueChange={(value) => {
+                      setSelectedAdminClientId(value);
+                      const selectedClient = allProfiles.find(c => c.user_id === value);
+                      if (selectedClient) {
+                        setNewAdminName(selectedClient.full_name || "");
+                      }
                       setError("");
                     }}
-                    placeholder="utilisateur@email.com"
-                  />
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choisir un client..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableClientsForEmployee.map((client) => (
+                        <SelectItem key={client.user_id} value={client.user_id}>
+                          {client.full_name || "Sans nom"} ({client.email})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="adminName">Nom affiché</Label>
@@ -618,9 +616,6 @@ const AdminUsersPage = () => {
                   />
                 </div>
                 {error && <p className="text-sm text-destructive">{error}</p>}
-                <p className="text-xs text-muted-foreground">
-                  L'utilisateur doit avoir un compte existant pour être ajouté comme administrateur.
-                </p>
                 <div className="flex gap-2 justify-end">
                   <Button
                     type="button"

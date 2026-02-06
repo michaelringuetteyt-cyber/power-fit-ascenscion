@@ -473,6 +473,15 @@ const AdminBookingsPage = () => {
                               Confirmer
                             </Button>
                           )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleCancelBooking(booking)}
+                            className="gap-1 text-destructive border-destructive hover:bg-destructive/10"
+                          >
+                            <XCircle className="w-3 h-3" />
+                            Annuler
+                          </Button>
                           <span className={`text-xs px-2 py-1 rounded-full ${
                             booking.status === "confirmed" 
                               ? "bg-green-500/20 text-green-500" 

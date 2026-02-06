@@ -32,6 +32,13 @@ interface TrialEligibility {
   checking: boolean;
 }
 
+interface ActivePass {
+  id: string;
+  pass_type: string;
+  remaining_sessions: number;
+  total_sessions: number;
+}
+
 const Booking = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
@@ -49,6 +56,8 @@ const Booking = () => {
     eligible: false,
     checking: false,
   });
+  const [activePasses, setActivePasses] = useState<ActivePass[]>([]);
+  const [selectedPass, setSelectedPass] = useState<ActivePass | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -56,7 +65,7 @@ const Booking = () => {
     type: "trial",
   });
 
-  // Check auth status and load profile
+  // Check auth status and load profile + passes
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -78,6 +87,18 @@ const Booking = () => {
             email: profile.email || "",
             phone: profile.phone || "",
           }));
+        }
+
+        // Load active passes
+        const { data: passes } = await supabase
+          .from("passes")
+          .select("id, pass_type, remaining_sessions, total_sessions")
+          .eq("user_id", user.id)
+          .eq("status", "active")
+          .gt("remaining_sessions", 0);
+        
+        if (passes) {
+          setActivePasses(passes);
         }
       }
     };
@@ -105,9 +126,22 @@ const Booking = () => {
               phone: profile.phone || "",
             }));
           }
+
+          // Load active passes
+          const { data: passes } = await supabase
+            .from("passes")
+            .select("id, pass_type, remaining_sessions, total_sessions")
+            .eq("user_id", session.user.id)
+            .eq("status", "active")
+            .gt("remaining_sessions", 0);
+          
+          if (passes) {
+            setActivePasses(passes);
+          }
         } else {
           setUserId(null);
           setIsLoggedIn(false);
+          setActivePasses([]);
         }
       }
     );
@@ -206,6 +240,7 @@ const Booking = () => {
 
   const appointmentTypes = [
     { id: "trial", label: "Cours d'essai gratuit", icon: "🎯", showCalendar: true },
+    { id: "session", label: "Séance avec laissez-passer", icon: "🎫", showCalendar: true, requiresPass: true },
     { id: "consultation", label: "Consultation bien-être", icon: "💪", showCalendar: false },
     { id: "coaching", label: "Session coaching", icon: "🏆", showCalendar: false },
   ];
@@ -260,8 +295,19 @@ const Booking = () => {
     }
   };
 
+  const getPassTypeLabel = (type: string) => {
+    switch (type) {
+      case "trial": return "Cours d'essai";
+      case "5_sessions": return "Carte 5 séances";
+      case "10_sessions": return "Carte 10 séances";
+      case "monthly": return "Mensuel";
+      default: return type;
+    }
+  };
+
   const handleTypeSelect = (type: typeof appointmentTypes[0]) => {
     setFormData({ ...formData, type: type.id });
+    setSelectedPass(null);
     
     if (type.id === "trial") {
       // Trial requires authentication
@@ -273,6 +319,25 @@ const Booking = () => {
       if (userId) {
         checkTrialEligibility(userId);
       }
+      return;
+    }
+
+    if (type.id === "session") {
+      // Session with pass requires authentication and active pass
+      if (!isLoggedIn) {
+        return;
+      }
+      // Check if user has active passes (non-trial)
+      const nonTrialPasses = activePasses.filter(p => p.pass_type !== "trial");
+      if (nonTrialPasses.length === 0) {
+        // No passes available - will show message
+        return;
+      }
+      // If only one pass, auto-select it
+      if (nonTrialPasses.length === 1) {
+        setSelectedPass(nonTrialPasses[0]);
+      }
+      setStep(2);
       return;
     }
     
@@ -295,13 +360,24 @@ const Booking = () => {
     
     if (!selectedDate || !selectedTime) return;
 
+    // For session type, must have a selected pass
+    if (formData.type === "session" && !selectedPass) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez sélectionner un laissez-passer.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const bookingData: any = {
       date: selectedDate,
       time_slot: selectedTime,
-      appointment_type: formData.type,
+      appointment_type: formData.type === "session" ? "Séance" : formData.type,
       client_name: formData.name,
       client_email: formData.email,
       client_phone: formData.phone,
+      status: "confirmed",
     };
 
     // Link to user account if logged in
@@ -309,15 +385,53 @@ const Booking = () => {
       bookingData.user_id = userId;
     }
 
-    const { error } = await supabase.from("bookings").insert(bookingData);
+    // Insert booking first
+    const { data: bookingResult, error: bookingError } = await supabase
+      .from("bookings")
+      .insert(bookingData)
+      .select("id")
+      .single();
 
-    if (error) {
+    if (bookingError) {
       toast({
         title: "Erreur",
         description: "Une erreur est survenue lors de la réservation.",
         variant: "destructive",
       });
-      if (import.meta.env.DEV) console.error("Booking error:", error);
+      if (import.meta.env.DEV) console.error("Booking error:", bookingError);
+      return;
+    }
+
+    // If session with pass, deduct a session
+    if (formData.type === "session" && userId && bookingResult) {
+      const { data: deductResult, error: deductError } = await supabase.rpc(
+        "deduct_session_from_pass",
+        { p_user_id: userId, p_booking_id: bookingResult.id }
+      );
+
+      if (deductError || !deductResult?.[0]?.success) {
+        // Rollback booking if deduction failed
+        await supabase.from("bookings").delete().eq("id", bookingResult.id);
+        toast({
+          title: "Erreur",
+          description: deductResult?.[0]?.message || "Impossible de déduire une séance de votre pass.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Update local passes state
+      setActivePasses(prev => prev.map(p => 
+        p.id === deductResult[0].pass_id 
+          ? { ...p, remaining_sessions: deductResult[0].remaining_sessions }
+          : p
+      ).filter(p => p.remaining_sessions > 0));
+
+      setStep(4);
+      toast({
+        title: "Réservation confirmée !",
+        description: `Séance réservée ! Il vous reste ${deductResult[0].remaining_sessions} séance(s) sur votre pass.`,
+      });
     } else {
       setStep(4);
       toast({
@@ -469,25 +583,40 @@ const Booking = () => {
               {step === 1 && (
                 <div className="space-y-6">
                   <h3 className="font-display text-2xl text-center mb-8">Choisissez votre type de rendez-vous</h3>
-                  <div className="grid md:grid-cols-3 gap-4">
-                    {appointmentTypes.map((type) => (
-                      <button
-                        key={type.id}
-                        onClick={() => handleTypeSelect(type)}
-                        disabled={trialEligibility.checking}
-                        className={`p-6 rounded-xl border transition-all duration-300 text-left hover:border-primary/50 ${
-                          formData.type === type.id 
-                            ? "border-primary bg-primary/10" 
-                            : "border-border bg-card"
-                        } ${trialEligibility.checking ? "opacity-50 cursor-wait" : ""}`}
-                      >
-                        <span className="text-3xl mb-4 block">{type.icon}</span>
-                        <span className="font-medium">{type.label}</span>
-                        {!type.showCalendar && (
-                          <span className="block text-xs text-muted-foreground mt-2">Remplir le formulaire →</span>
-                        )}
-                      </button>
-                    ))}
+                  <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {appointmentTypes.map((type) => {
+                      const isSessionType = type.id === "session";
+                      const nonTrialPasses = activePasses.filter(p => p.pass_type !== "trial");
+                      const hasValidPass = isSessionType && isLoggedIn && nonTrialPasses.length > 0;
+                      const isDisabled = isSessionType && isLoggedIn && nonTrialPasses.length === 0;
+                      
+                      return (
+                        <button
+                          key={type.id}
+                          onClick={() => handleTypeSelect(type)}
+                          disabled={trialEligibility.checking || isDisabled}
+                          className={`p-6 rounded-xl border transition-all duration-300 text-left hover:border-primary/50 ${
+                            formData.type === type.id 
+                              ? "border-primary bg-primary/10" 
+                              : "border-border bg-card"
+                          } ${trialEligibility.checking || isDisabled ? "opacity-50 cursor-not-allowed" : ""}`}
+                        >
+                          <span className="text-3xl mb-4 block">{type.icon}</span>
+                          <span className="font-medium">{type.label}</span>
+                          {!type.showCalendar && (
+                            <span className="block text-xs text-muted-foreground mt-2">Remplir le formulaire →</span>
+                          )}
+                          {isSessionType && hasValidPass && (
+                            <span className="block text-xs text-primary mt-2">
+                              {nonTrialPasses.reduce((sum, p) => sum + p.remaining_sessions, 0)} séance(s) disponible(s)
+                            </span>
+                          )}
+                          {isSessionType && isLoggedIn && nonTrialPasses.length === 0 && (
+                            <span className="block text-xs text-muted-foreground mt-2">Aucun pass actif</span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
 
                   {/* Trial login prompt - shown when trial is selected but user not logged in */}
@@ -583,12 +712,132 @@ const Booking = () => {
                       <p className="text-muted-foreground">Vérification de votre éligibilité...</p>
                     </div>
                   )}
+
+                  {/* Session login prompt - shown when session is selected but user not logged in */}
+                  {formData.type === "session" && !isLoggedIn && (
+                    <div className="p-6 rounded-xl bg-primary/10 border border-primary/30">
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
+                          <LogIn className="w-6 h-6 text-primary" />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-display text-lg mb-2">Connexion requise</h4>
+                          <p className="text-sm text-muted-foreground mb-4">
+                            Pour réserver une séance avec votre laissez-passer, vous devez être connecté à votre compte.
+                          </p>
+                          <div className="flex flex-col sm:flex-row gap-3">
+                            <Button 
+                              variant="hero"
+                              onClick={() => navigate("/auth?redirect=/#booking")}
+                            >
+                              <LogIn className="w-4 h-4 mr-2" />
+                              Se connecter
+                            </Button>
+                            <Button 
+                              variant="outline"
+                              onClick={() => navigate("/auth?redirect=/#booking")}
+                            >
+                              Créer un compte
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Session no pass message */}
+                  {formData.type === "session" && isLoggedIn && activePasses.filter(p => p.pass_type !== "trial").length === 0 && (
+                    <div className="p-6 rounded-xl bg-secondary/10 border border-secondary/30">
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-secondary/20 flex items-center justify-center flex-shrink-0">
+                          <Ticket className="w-6 h-6 text-secondary" />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-display text-lg mb-2">Aucun laissez-passer actif</h4>
+                          <p className="text-sm text-muted-foreground mb-4">
+                            Vous n'avez pas de laissez-passer actif avec des séances disponibles.
+                            Achetez un pass pour réserver vos séances facilement !
+                          </p>
+                          <div className="flex flex-col sm:flex-row gap-3">
+                            <Button 
+                              variant="hero"
+                              onClick={() => {
+                                const pricingSection = document.getElementById("pricing");
+                                if (pricingSection) {
+                                  pricingSection.scrollIntoView({ behavior: "smooth" });
+                                } else {
+                                  const contactSection = document.getElementById("contact");
+                                  contactSection?.scrollIntoView({ behavior: "smooth" });
+                                }
+                              }}
+                            >
+                              <ShoppingBag className="w-4 h-4 mr-2" />
+                              Voir les offres
+                            </Button>
+                            <Button 
+                              variant="outline"
+                              onClick={() => {
+                                const contactSection = document.getElementById("contact");
+                                contactSection?.scrollIntoView({ behavior: "smooth" });
+                              }}
+                            >
+                              <Mail className="w-4 h-4 mr-2" />
+                              Nous contacter
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
               {step === 2 && (
                 <div className="space-y-6">
                   <h3 className="font-display text-2xl text-center mb-8">Choisissez votre créneau</h3>
+                  
+                  {/* Pass selection for session type with multiple passes */}
+                  {formData.type === "session" && activePasses.filter(p => p.pass_type !== "trial").length > 1 && (
+                    <div className="mb-6">
+                      <h4 className="font-medium mb-3 flex items-center gap-2">
+                        <Ticket className="w-4 h-4 text-primary" />
+                        Sélectionnez votre laissez-passer
+                      </h4>
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        {activePasses.filter(p => p.pass_type !== "trial").map((pass) => (
+                          <button
+                            key={pass.id}
+                            onClick={() => setSelectedPass(pass)}
+                            className={`p-4 rounded-lg border text-left transition-all ${
+                              selectedPass?.id === pass.id
+                                ? "border-primary bg-primary/10"
+                                : "border-border hover:border-primary/50"
+                            }`}
+                          >
+                            <p className="font-medium">{getPassTypeLabel(pass.pass_type)}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {pass.remaining_sessions}/{pass.total_sessions} séances restantes
+                            </p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Show selected pass info */}
+                  {formData.type === "session" && selectedPass && (
+                    <div className="p-4 rounded-lg bg-primary/10 border border-primary/20 mb-4">
+                      <div className="flex items-center gap-3">
+                        <Ticket className="w-5 h-5 text-primary" />
+                        <div>
+                          <p className="font-medium">{getPassTypeLabel(selectedPass.pass_type)}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {selectedPass.remaining_sessions} séance(s) restante(s) — 1 sera déduite après confirmation
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   
                   {loading ? (
                     <div className="text-center py-8 text-muted-foreground">

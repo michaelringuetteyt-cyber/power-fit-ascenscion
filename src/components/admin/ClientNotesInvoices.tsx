@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +31,9 @@ import {
   Edit,
   Upload,
   Download,
-  X
+  X,
+  Search,
+  ArrowUpDown
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -42,6 +44,7 @@ interface Profile {
   user_id: string;
   full_name: string;
   email: string;
+  phone: string | null;
 }
 
 interface ClientNote {
@@ -67,6 +70,8 @@ interface ClientInvoice {
   created_by: string;
 }
 
+type InvoiceSortOption = "recent" | "oldest" | "created";
+
 const ClientNotesInvoices = () => {
   const { toast } = useToast();
   const [clients, setClients] = useState<Profile[]>([]);
@@ -74,6 +79,12 @@ const ClientNotesInvoices = () => {
   const [notes, setNotes] = useState<ClientNote[]>([]);
   const [invoices, setInvoices] = useState<ClientInvoice[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Client search
+  const [clientSearchTerm, setClientSearchTerm] = useState("");
+  
+  // Invoice sorting
+  const [invoiceSortBy, setInvoiceSortBy] = useState<InvoiceSortOption>("recent");
   
   // Note dialog
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
@@ -96,6 +107,40 @@ const ClientNotesInvoices = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [existingFileUrl, setExistingFileUrl] = useState<string | null>(null);
+  
+  // Filtered clients based on search
+  const filteredClients = useMemo(() => {
+    if (!clientSearchTerm.trim()) return clients;
+    
+    const term = clientSearchTerm.toLowerCase();
+    return clients.filter(client =>
+      client.full_name?.toLowerCase().includes(term) ||
+      client.email?.toLowerCase().includes(term) ||
+      client.phone?.toLowerCase().includes(term)
+    );
+  }, [clients, clientSearchTerm]);
+  
+  // Sorted invoices
+  const sortedInvoices = useMemo(() => {
+    const sorted = [...invoices];
+    
+    switch (invoiceSortBy) {
+      case "recent":
+        return sorted.sort((a, b) => 
+          new Date(b.invoice_date).getTime() - new Date(a.invoice_date).getTime()
+        );
+      case "oldest":
+        return sorted.sort((a, b) => 
+          new Date(a.invoice_date).getTime() - new Date(b.invoice_date).getTime()
+        );
+      case "created":
+        return sorted.sort((a, b) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+      default:
+        return sorted;
+    }
+  }, [invoices, invoiceSortBy]);
 
   useEffect(() => {
     loadClients();
@@ -119,7 +164,7 @@ const ClientNotesInvoices = () => {
     
     const { data: profiles } = await supabase
       .from("profiles")
-      .select("*")
+      .select("id, user_id, full_name, email, phone")
       .order("full_name");
     
     if (profiles) {
@@ -427,34 +472,66 @@ const ClientNotesInvoices = () => {
 
   return (
     <div className="space-y-6">
-      {/* Client Selection */}
+      {/* Client Selection with Search */}
       <div className="dashboard-card">
-        <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex-1 min-w-[250px]">
-            <Label className="mb-2 block">Sélectionner un client</Label>
-            <Select value={selectedClient} onValueChange={setSelectedClient}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choisir un client..." />
-              </SelectTrigger>
-              <SelectContent>
-                {clients.map((client) => (
-                  <SelectItem key={client.user_id} value={client.user_id}>
-                    <div className="flex items-center gap-2">
-                      <User className="w-4 h-4" />
-                      {client.full_name || client.email}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {selectedClientData && (
-            <div className="text-sm text-muted-foreground">
-              <span className="font-medium">{selectedClientData.full_name}</span>
-              <span className="mx-2">•</span>
-              {selectedClientData.email}
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Rechercher un client</Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher par nom, email ou téléphone..."
+                value={clientSearchTerm}
+                onChange={(e) => setClientSearchTerm(e.target.value)}
+                className="pl-10"
+              />
             </div>
-          )}
+          </div>
+          
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex-1 min-w-[250px]">
+              <Label className="mb-2 block">Sélectionner un client</Label>
+              <Select value={selectedClient} onValueChange={setSelectedClient}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choisir un client..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {filteredClients.length === 0 ? (
+                    <div className="py-4 text-center text-sm text-muted-foreground">
+                      Aucun client trouvé
+                    </div>
+                  ) : (
+                    filteredClients.map((client) => (
+                      <SelectItem key={client.user_id} value={client.user_id}>
+                        <div className="flex flex-col">
+                          <span className="flex items-center gap-2">
+                            <User className="w-4 h-4" />
+                            {client.full_name || "Sans nom"}
+                          </span>
+                          <span className="text-xs text-muted-foreground ml-6">
+                            {client.email} {client.phone && `• ${client.phone}`}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            {selectedClientData && (
+              <div className="text-sm text-muted-foreground">
+                <span className="font-medium">{selectedClientData.full_name}</span>
+                <span className="mx-2">•</span>
+                {selectedClientData.email}
+                {selectedClientData.phone && (
+                  <>
+                    <span className="mx-2">•</span>
+                    {selectedClientData.phone}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -549,15 +626,27 @@ const ClientNotesInvoices = () => {
           {/* Invoices Tab */}
           <TabsContent value="invoices">
             <div className="dashboard-card">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                 <h3 className="font-display text-lg">Factures du client</h3>
-                <Dialog open={invoiceDialogOpen} onOpenChange={setInvoiceDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="hero" size="sm" className="gap-2" onClick={openAddInvoice}>
-                      <Plus className="w-4 h-4" />
-                      Ajouter une facture
-                    </Button>
-                  </DialogTrigger>
+                <div className="flex items-center gap-2">
+                  <Select value={invoiceSortBy} onValueChange={(v) => setInvoiceSortBy(v as InvoiceSortOption)}>
+                    <SelectTrigger className="w-[160px]">
+                      <ArrowUpDown className="w-4 h-4 mr-2" />
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="recent">Plus récentes</SelectItem>
+                      <SelectItem value="oldest">Plus anciennes</SelectItem>
+                      <SelectItem value="created">Date d'ajout</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Dialog open={invoiceDialogOpen} onOpenChange={setInvoiceDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="hero" size="sm" className="gap-2" onClick={openAddInvoice}>
+                        <Plus className="w-4 h-4" />
+                        Ajouter une facture
+                      </Button>
+                    </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
                       <DialogTitle className="font-display">
@@ -684,7 +773,8 @@ const ClientNotesInvoices = () => {
                       </div>
                     </div>
                   </DialogContent>
-                </Dialog>
+                  </Dialog>
+                </div>
               </div>
 
               {invoices.length === 0 ? (
@@ -707,7 +797,7 @@ const ClientNotesInvoices = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {invoices.map((invoice) => (
+                      {sortedInvoices.map((invoice) => (
                         <tr key={invoice.id} className="border-b border-border/50 group">
                           <td className="py-3 font-medium">
                             <div className="flex items-center gap-2">

@@ -30,6 +30,29 @@ const Gallery = () => {
 
   useEffect(() => {
     loadGalleryImages();
+
+    // Abonnement temps réel pour mise à jour automatique
+    const channel = supabase
+      .channel('gallery-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'site_content',
+          filter: 'section=eq.gallery'
+        },
+        () => {
+          // Recharger les images quand il y a un changement
+          loadGalleryImages();
+        }
+      )
+      .subscribe();
+
+    // Nettoyage à la destruction du composant
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const loadGalleryImages = async () => {

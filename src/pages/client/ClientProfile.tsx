@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { User, Mail, Phone, Camera, Lock } from "lucide-react";
+import { User, Mail, Phone, Camera, Lock, Loader2 } from "lucide-react";
 import { z } from "zod";
 
 const profileSchema = z.object({
@@ -28,6 +28,7 @@ function ClientProfile() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [profile, setProfile] = useState({
     full_name: "",
     email: "",
@@ -162,6 +163,61 @@ function ClientProfile() {
     }
   };
 
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    setUploadingAvatar(true);
+
+    const fileExt = file.name.split('.').pop();
+    const filePath = `${user.id}/avatar.${fileExt}`;
+
+    // Upload to storage
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(filePath, file, { upsert: true });
+
+    if (uploadError) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de télécharger la photo",
+        variant: "destructive",
+      });
+      setUploadingAvatar(false);
+      return;
+    }
+
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('avatars')
+      .getPublicUrl(filePath);
+
+    // Update profile
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ avatar_url: publicUrl })
+      .eq('user_id', user.id);
+
+    setUploadingAvatar(false);
+
+    if (updateError) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de mettre à jour le profil",
+        variant: "destructive",
+      });
+    } else {
+      setProfile(prev => ({ ...prev, avatar_url: publicUrl }));
+      toast({
+        title: "Photo mise à jour",
+        description: "Votre photo de profil a été changée",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <ClientLayout>
@@ -191,7 +247,7 @@ function ClientProfile() {
               {/* Avatar */}
               <div className="flex justify-center mb-6">
                 <div className="relative">
-                  <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center">
+                  <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden">
                     {profile.avatar_url ? (
                       <img
                         src={profile.avatar_url}
@@ -202,12 +258,24 @@ function ClientProfile() {
                       <User className="w-10 h-10 text-primary" />
                     )}
                   </div>
-                  <button
-                    type="button"
-                    className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-primary flex items-center justify-center hover:bg-primary/80 transition-colors"
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    id="avatar-upload"
+                    onChange={handleAvatarUpload}
+                    disabled={uploadingAvatar}
+                  />
+                  <label
+                    htmlFor="avatar-upload"
+                    className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-primary flex items-center justify-center hover:bg-primary/80 transition-colors cursor-pointer"
                   >
-                    <Camera className="w-4 h-4 text-primary-foreground" />
-                  </button>
+                    {uploadingAvatar ? (
+                      <Loader2 className="w-4 h-4 text-primary-foreground animate-spin" />
+                    ) : (
+                      <Camera className="w-4 h-4 text-primary-foreground" />
+                    )}
+                  </label>
                 </div>
               </div>
 

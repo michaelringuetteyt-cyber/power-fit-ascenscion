@@ -47,7 +47,7 @@ const Services = () => {
     {
       icon: Apple,
       title: "ACCOMPAGNEMENT NUTRITIONNEL",
-      subtitle: "Solution Herbalife",
+      subtitle: "",
       description: "Une approche nutritionnelle simple et efficace avec les produits Herbalife pour optimiser vos résultats et votre énergie au quotidien.",
       features: ["Conseils personnalisés", "Produits de qualité", "Plans repas simples", "Résultats durables"],
       color: "primary",
